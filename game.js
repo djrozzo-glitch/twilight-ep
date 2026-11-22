@@ -9,13 +9,22 @@ const stages = [
   { name: "Soundcheck", speed: 352, rows: [".oo..oo.","oo####oo","#s#oo#d#",".##..##.","####r###","..####.."] },
   { name: "System Pressure", speed: 380, rows: ["ooo##ooo","o##oo##o","##d##s##","o##oo##o","##r#####",".######."] },
 ];
+const tracks = [
+  { title: "lowQ – Twilight", file: "lowQ - Twilight.mp3" },
+  { title: "lowQ – Run from Babylon", file: "lowQ – Run from Babylon.mp3" },
+];
+const music = new Audio();
+music.preload = "none";
+music.volume = .8;
+let trackIndex = 0;
+let failedTracks = 0;
 const powerups = {d:{name:"DUBPLATE",color:BLUE},s:{name:"STACK",color:LIME},r:{name:"REWIND",color:AMBER}};
 const keys = new Set();
 const motion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const getBest = () => { try { return Number(localStorage.getItem("pressure-test-best")) || 0; } catch { return 0; } };
 let best = getBest(), score = 0, level = 0, lives = 3, pressure = 0, mode = "menu", priorMode;
 let bricks = [], balls = [], drops = [], sparks = [], bat = W / 2, wide = 0, rewind = false;
-let flash = 0, time = 0, noticeUntil = 0, soundtrackClock = 0, nextBeat = 0, beat = 0;
+let flash = 0, time = 0, noticeUntil = 0;
 let audio, master, sound = true;
 let pointer, backdrop;
 
@@ -77,10 +86,9 @@ function startGame() {
   level = 0;
   score = 0;
   lives = 3;
-  soundtrackClock = 0;
-  nextBeat = 0;
-  beat = 0;
   startWall();
+  failedTracks = 0;
+  loadTrack(0);
 }
 function startWall() {
   pressure = 0; bat = W/2; wide = 0; rewind = false; drops = []; sparks = [];
@@ -122,6 +130,7 @@ function wallCleared() {
   addScore(250);
   if(level === stages.length-1) {
     show("won","ALL THREE WALLS CLEARED","SYSTEM CLEAR.",`Final score ${score.toLocaleString("en-GB")}.`,"Play again");
+    syncMusic();
     return;
   }
   show("clear","WALL CLEARED",stages[level].name.toUpperCase()+".",`Next up · ${stages[level+1].name}`,"Next wall");
@@ -141,6 +150,7 @@ function loseBall() {
   hud();
   if(lives === 0) {
     show("lost","END OF SET","SIGNAL LOST.",`Score ${score.toLocaleString("en-GB")} · Best ${best.toLocaleString("en-GB")}`,"Play again");
+    syncMusic();
     return;
   }
   ready();
@@ -189,7 +199,6 @@ function update(dt) {
   if(mode !== "ready" && mode !== "playing") return;
   const direction = Number(keys.has("ArrowRight")||keys.has("KeyD"))-Number(keys.has("ArrowLeft")||keys.has("KeyA"));
   if(direction) bat = clamp(bat+direction*530*dt,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
-  tickMusic(dt);
   if(mode === "ready") {balls[0].x = bat;return;}
   wide = Math.max(0,wide-dt);
   for(const ball of balls) {
@@ -369,30 +378,36 @@ function note(type,freq,end,duration,volume,when) {
   osc.start(at);osc.stop(at+duration+.015);
 }
 function soundHit(f,d,type) {note(type,f,f*.65,d,.07);}
-function tickMusic(dt) {
-  soundtrackClock+=dt;
-  if(soundtrackClock<nextBeat) return;
-  nextBeat+=60/140/2;
-  const step=beat%16, bar=Math.floor(beat/16)%4;
-  if(step===0 || step===7 || (bar%2===1 && step===14)) {
-    note("sine",146,39,.19,.34);
-    if(step===0) flash=bar===2?.51:.2;
+function syncMusic() {
+  if(!sound || document.hidden || !["ready","playing","clear"].includes(mode) || failedTracks >= tracks.length) {
+    music.pause();
+    return;
   }
-  if(step===8) {
-    note("triangle",232,92,.12,.17);
-    note("sawtooth",780,320,.083,.029);
-  }
-  if(step%2 || step===14) note("square",6200,3100,.032,.009);
-  if([0,3,6,10,12,15].includes(step)) {
-    const f=[49,49,43.65,46.25][bar];
-    note("sine",f,f*.995,step===0?.32:.17,.26);
-    note("triangle",f*2,f*1.99,.16,.036);
-  }
-  beat++;
+  music.play().catch(() => {
+    // The next user gesture can resume playback when autoplay is blocked.
+  });
 }
+function loadTrack(index) {
+  trackIndex = index;
+  const track = tracks[index];
+  get("track").textContent = track.title;
+  music.src = "assets/audio/" + encodeURIComponent(track.file);
+  syncMusic();
+}
+music.addEventListener("ended", () => {
+  failedTracks = 0;
+  loadTrack((trackIndex + 1) % tracks.length);
+});
+music.addEventListener("error", () => {
+  failedTracks++;
+  if(failedTracks < tracks.length) loadTrack((trackIndex + 1) % tracks.length);
+  else get("track").textContent = "Soundtrack unavailable";
+});
 function togglePause() {
   if(mode==="paused") {
     setActive(priorMode);
+    initAudio();
+    syncMusic();
     if(priorMode==="ready") announce("TAP OR PRESS SPACE TO LAUNCH",60);
     return;
   }
@@ -400,6 +415,7 @@ function togglePause() {
   priorMode=mode;
   keys.clear();
   show("paused","HOLD","PAUSED.","The sound system is on standby.","Resume","Press P or Escape to resume");
+  syncMusic();
 }
 function action() {
   initAudio();
@@ -417,6 +433,7 @@ field.addEventListener("pointerdown",event=>{
   field.setPointerCapture(pointer);
   movePointer(event);
   initAudio();
+  if(music.paused) syncMusic();
   serve();
 });
 field.addEventListener("pointermove",event=>{
@@ -432,6 +449,7 @@ get("sound").addEventListener("click",()=>{
   if(master) master.gain.setTargetAtTime(sound?.55:0,audio.currentTime,.025);
   get("sound").textContent=sound?"Sound on":"Sound off";
   get("sound").setAttribute("aria-pressed",sound);
+  syncMusic();
 });
 window.addEventListener("keydown",event=>{
   if(event.altKey || event.ctrlKey || event.metaKey) return;
@@ -441,12 +459,13 @@ window.addEventListener("keydown",event=>{
   }
   if(event.repeat) return;
   if(event.code==="KeyP" || event.code==="Escape") {togglePause();return;}
-  if(event.code==="Space" && mode==="ready") {event.preventDefault();initAudio();serve();}
+  if(event.code==="Space" && mode==="ready") {event.preventDefault();initAudio();if(music.paused) syncMusic();serve();}
 });
 window.addEventListener("keyup",event=>keys.delete(event.code));
 window.addEventListener("blur",()=>keys.clear());
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden && ["ready","playing"].includes(mode)) togglePause();
+  else syncMusic();
 });
 new ResizeObserver(resize).observe(field);
 backdrop=makeBackdrop();
