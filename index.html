@@ -23,18 +23,22 @@
     </div>
   </header>
   <div class="hud" aria-label="Game status">
-    <div><span>Wave</span><strong id="level">01 / 03</strong></div>
+    <div><span>Level</span><strong id="level">01 / 10</strong></div>
     <div><span>Score</span><strong id="score">00000</strong></div>
     <div class="pressure"><span>Pressure</span><div id="pressure" role="meter" aria-label="Pressure" aria-valuemin="0" aria-valuemax="6" aria-valuenow="0"></div></div>
     <div><span>Lives</span><strong id="lives" aria-label="3 lives">● ● ●</strong></div>
   </div>
   <section class="stage" aria-label="Playing field">
     <canvas id="field" width="640" height="570" aria-label="Bounce the record into the advancing crowd. Move the DJ with the touch strip below, mouse, or arrow keys."></canvas>
+    <div class="stage-status">
+      <span id="incoming"></span>
+      <span id="effects" hidden></span>
+    </div>
     <div class="overlay" id="overlay">
       <div class="panel">
         <div class="kicker" id="kicker">BASS ARCADE</div>
         <h1 id="title">TWILIGHT<span>.</span></h1>
-        <p id="message">Bounce the record into the crowd.<br>Keep three waves away from the decks.</p>
+        <p id="message">Bounce the record into the crowd.<br>Clear ten levels and keep the crowd away from the decks.</p>
         <button class="action" id="action">Start game</button>
         <small id="hint">Touch strip · Mouse · Arrow keys</small>
       </div>
