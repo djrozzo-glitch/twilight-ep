@@ -2,7 +2,8 @@
 const get = id => document.getElementById(id);
 const field = get("field");
 const ctx = field.getContext("2d");
-const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, PADDLE_Y = 520, BREACH_Y = 474, R = 10;
+const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, BREACH_Y = 474, R = 10;
+const DJ_BOTTOM = H - 4, DJ_DECK_ROW = 425/512, DJ_BOTTOM_ROW = 496/512;
 const LIME = "#e2fc75", AMBER = "#ff9c61", BLUE = "#9fe1f1";
 const stages = [
   { name:"The Arch", speed:327, advance:2.55, rows:[".V.I.", "I.P.L", "dVrLs"] },
@@ -17,6 +18,7 @@ const clubbers = {
 };
 const bonusCarriers = {d:"V", s:"L", r:"I"};
 const art = {};
+const djProfiles = new Map();
 function loadImage(key, path) {
   const image = new Image();
   image.src = path;
@@ -126,7 +128,7 @@ function loadWave() {
 }
 function ready() {
   throwElapsed = -1;
-  balls = [newBall(bat,PADDLE_Y-R-2)];
+  balls = [newBall(bat,readyBallY())];
   balls[0].attached = true;
   setActive("ready");
   announce("TAP OR PRESS SPACE TO LAUNCH",60);
@@ -159,7 +161,7 @@ function advanceThrow(dt) {
     const width = paddleWidth();
     // The hand in the release frame is above and to the right of the deck.
     ball.x = clamp(bat + width*.46,LEFT+R,RIGHT-R);
-    ball.y = PADDLE_Y - width*.86*spriteAspect;
+    ball.y = deckY() - width*.86*spriteAspect;
     ball.attached = false;
     launch(ball,bat < W/2 ? .31 : -.31);
     setActive("playing");
@@ -173,13 +175,75 @@ function launch(ball, angle) {
   ball.vy = -Math.cos(angle)*speed;
 }
 function paddleWidth() {return wide > 0 ? 156 : 112;}
-function hitBat(ball) {
+function djHeight() {return paddleWidth()*1.13*spriteAspect;}
+function djTop() {return DJ_BOTTOM-djHeight()*DJ_BOTTOM_ROW;}
+function deckY() {return djTop()+djHeight()*DJ_DECK_ROW;}
+function readyBallY() {return djTop()+djHeight()*40/512-(R+3)*spriteAspect;}
+
+function djBounds() {
+  const width = paddleWidth();
+  const frame = throwElapsed < 0 ? throwFrames[0] : throwFrames.findLast(({start})=>start<=throwElapsed);
+  if(imageReady(art[frame.sprite])) {
+    const w = width*512/350;
+    return {sprite:frame.sprite,x:bat-w/2,y:djTop(),w,h:djHeight()};
+  }
+  const legacy = throwElapsed >= releaseTime ? "dj-hit" : "dj-idle";
+  if(imageReady(art[legacy])) {
+    const h = width*.87*spriteAspect;
+    return {sprite:legacy,x:bat-width/2,y:DJ_BOTTOM-h,w:width,h};
+  }
+  return {x:bat-width/2,y:deckY(),w:width,h:13};
+}
+
+function djProfile(spriteName) {
+  if(djProfiles.has(spriteName)) return djProfiles.get(spriteName);
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const mask = canvas.getContext("2d",{willReadFrequently:true});
+  mask.drawImage(art[spriteName],0,0,size,size);
+  const {data} = mask.getImageData(0,0,size,size);
+  const top = new Uint8Array(size).fill(size);
+  const bottom = new Uint8Array(size);
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
+    if(data[(y*size+x)*4+3] < 110) continue;
+    top[x] = Math.min(top[x],y);
+    bottom[x] = y+1;
+  }
+  const profile = {top,bottom};
+  djProfiles.set(spriteName,profile);
+  return profile;
+}
+
+function djContact(ball, previousY, dj) {
+  const radiusY = R*spriteAspect;
+  if(ball.vy <= 0 || ball.y+radiusY < dj.y || previousY-radiusY > dj.y+dj.h ||
+    ball.x+R < dj.x || ball.x-R > dj.x+dj.w) return undefined;
+  const {top,bottom} = dj.sprite ? djProfile(dj.sprite) : {top:[0],bottom:[1]};
+  const stepX = dj.w/top.length, stepY = dj.h/top.length;
+  const first = Math.max(0,Math.floor((ball.x-R-dj.x)/stepX));
+  const last = Math.min(top.length-1,Math.floor((ball.x+R-dj.x)/stepX));
+  let contact;
+  for(let col=first;col<=last;col++) {
+    if(bottom[col] === 0) continue;
+    const left = dj.x+col*stepX;
+    const dx = ball.x-clamp(ball.x,left,left+stepX);
+    const reach = radiusY*Math.sqrt(Math.max(0,1-(dx/R)**2));
+    const surface = dj.y+top[col]*stepY-reach;
+    if(ball.y >= surface && previousY <= dj.y+bottom[col]*stepY+reach) {
+      contact = contact === undefined ? surface : Math.min(contact,surface);
+    }
+  }
+  return contact;
+}
+
+function hitBat(ball, contact) {
   const offset = clamp((ball.x-bat)/(paddleWidth()/2),-1,1);
   let angle = offset * 1.04;
   if(Math.abs(angle)<.13) angle = (angle || ball.vx || 1) < 0 ? -.13 : .13;
   launch(ball,angle);
   throwElapsed = releaseTime;
-  ball.y = PADDLE_Y-R-.1;
+  ball.y = contact-.25;
   if(pressure === 6) {
     ball.pierce = 4;
     pressure = 0;
@@ -232,7 +296,7 @@ function collect(type) {
   if(type === "s") wide = 14;
   if(type === "r") rewind = true;
   if(type === "d" && balls.length < 4) {
-    const extra = newBall(bat,PADDLE_Y-R-3);
+    const extra = newBall(bat,readyBallY());
     launch(extra, bat < W/2 ? .66 : -.66);
     balls.push(extra);
   }
@@ -276,7 +340,7 @@ function update(dt) {
   const direction = Number(keys.has("ArrowRight")||keys.has("KeyD"))-Number(keys.has("ArrowLeft")||keys.has("KeyA"));
   if(direction) bat = clamp(bat+direction*530*dt,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
   advanceThrow(dt);
-  if(mode === "ready") {balls[0].x = bat;return;}
+  if(mode === "ready") {balls[0].x = bat;balls[0].y = readyBallY();return;}
   wide = Math.max(0,wide-dt);
   bat = clamp(bat,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
   walkTime += dt;
@@ -285,6 +349,7 @@ function update(dt) {
     enemy.hurt = Math.max(0,enemy.hurt-dt);
     placeClubber(enemy);
   }
+  const dj = djBounds();
   for(const ball of balls) {
     const oldX = ball.x, oldY = ball.y;
     ball.x += ball.vx*dt;
@@ -294,7 +359,11 @@ function update(dt) {
       ball.vx *= -1;
     }
     if(ball.y-R<TOP) {ball.y=TOP+R;ball.vy=Math.abs(ball.vy);}
-    if(ball.vy>0 && oldY+R<=PADDLE_Y && ball.y+R>=PADDLE_Y && Math.abs(ball.x-bat)<paddleWidth()/2+R*.7) hitBat(ball);
+    const contact = djContact(ball,oldY,dj);
+    if(contact !== undefined) {
+      hitBat(ball,contact);
+      continue;
+    }
     const enemy = crowd.find(b=>{
       const dx = ball.x-clamp(ball.x,b.x,b.x+b.w), dy = ball.y-clamp(ball.y,b.y,b.y+b.h);
       return dx*dx+dy*dy<=R*R;
@@ -307,8 +376,9 @@ function update(dt) {
   if(!balls.length) {loseBall();return;}
   for(const drop of drops) {
     const previous = drop.y;
+    const deck = deckY();
     drop.y += 171*dt;
-    if(previous+11<PADDLE_Y && drop.y+11>=PADDLE_Y && Math.abs(drop.x-bat)<paddleWidth()/2+17) {
+    if(previous+11<deck && drop.y+11>=deck && Math.abs(drop.x-bat)<paddleWidth()/2+17) {
       collect(drop.type);
       drop.y = H+30;
     }
@@ -356,20 +426,14 @@ function drawClubber(enemy) {
   if(enemy.hp>1) rect(enemy.center-7,foot+3,14,2,info.color);
 }
 function drawDJ() {
-  const width = paddleWidth();
-  // Match the visible deck width to the paddle and pin the deck top to its bounce line.
-  const drawW = width*512/350, drawH = width*1.13*spriteAspect;
-  const frame = throwElapsed < 0 ? throwFrames[0] : throwFrames.findLast(({start})=>start<=throwElapsed);
-  if(!sprite(frame.sprite,bat-drawW/2,PADDLE_Y-drawH*425/512,drawW,drawH)) {
-    const legacyH = width*.87*spriteAspect;
-    if(!sprite(throwElapsed >= releaseTime?"dj-hit":"dj-idle",bat-width/2,PADDLE_Y-legacyH*.78,width,legacyH)) {
-      rect(bat-width/2,PADDLE_Y,width,13,"#555548");
-    }
-  }
+  const dj = djBounds();
+  if(dj.sprite) sprite(dj.sprite,dj.x,dj.y,dj.w,dj.h);
+  else rect(dj.x,dj.y,dj.w,dj.h,"#555548");
   if(pressure===6 || rewind) {
+    const width = paddleWidth();
     const trim = pressure===6?LIME:AMBER;
-    rect(bat-width/2+3,PADDLE_Y-1,16,2,trim);
-    rect(bat+width/2-19,PADDLE_Y-1,16,2,trim);
+    rect(bat-width/2+3,deckY()-1,16,2,trim);
+    rect(bat+width/2-19,deckY()-1,16,2,trim);
   }
 }
 function draw() {
