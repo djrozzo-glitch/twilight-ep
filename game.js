@@ -10,22 +10,28 @@ const ALLEY_W = 1122, ALLEY_H = 1402, ARCH_X = .505, ARCH_Y = .446;
 const FRONT_ROW_Y = 402, ENTRY_DEPTH = 20;
 const LIME = "#e2fc75", AMBER = "#ff9c61", BLUE = "#9fe1f1";
 const stages = [
-  {name:"The Arch", speed:326, advance:2.5, rows:["VI.LV","ILVP.","IVLVI",".VILV","d.V.s"], incoming:[".LVP.","I.r.V"]},
-  {name:"Side Street", speed:338, advance:2.8, rows:["I.VPL","PIVL.","VILVP",".IVPL","Vs.Vd"], incoming:["I.bVL",".V.rP"]},
-  {name:"Soundcheck", speed:350, advance:3.1, rows:["VP.IL","VILPI","IPV.L","PLIVP",".dP.s"], incoming:["I.mLV",".rPl."]},
-  {name:"Back Door", speed:362, advance:3.4, rows:["LIP.V","PILVP","IVPIL","VP.IL","ds.PV"], incoming:[".mI.P","V.lPI","I.bPr"]},
-  {name:"Last Entry", speed:374, advance:3.7, rows:["PL.IV","ILPVP","LPVIL","PILPV","IVsPd"], incoming:[".lPLI","Vw.Ir",".VcLP"]},
-  {name:"The Queue", speed:388, advance:4.0, rows:["IPLV.","VPLPI","PLIPV","ILVPP","dPsIV"], incoming:["b.VwP","Lm.PV","Irl.L"]},
-  {name:"Lock-In", speed:403, advance:4.3, rows:["PLVPI","VPIPL","ILPVP","PPIVL","IdPsV"], incoming:[".uPbI","Vm.LP","lVrPw"]},
-  {name:"No Guest List", speed:418, advance:4.7, rows:["VLPPI","LIPVP","VPIPL","IPPLV","PsdVL"], incoming:["wIP.V","Pm.bI","lVPIr","IcLuP"]},
-  {name:"Peak Time", speed:435, advance:5.1, rows:["PVILP","LPIPV","VPPLI","IPVPP","sPdPV"], incoming:["PmIbV","u.PwL","IVlPr","P.cVP"]},
-  {name:"System Pressure", speed:455, advance:5.5, rows:["PPIVL","LPPVI","PVPPP","IPPVL","LsdPP"], incoming:["mVPwI","IlPbV","PrVuP","PL.cI"]},
+  {name:"The Arch", speed:326, advance:2.5, rows:["NI.LV","ILNP.","IVHVI",".NILH","d.V.s"], incoming:[".LHP.","I.r.N"]},
+  {name:"Side Street", speed:338, advance:2.8, rows:["I.OPL","PINH.","VOLVN",".IVPH","Vs.Od"], incoming:["I.bOL",".V.rP"]},
+  {name:"Soundcheck", speed:350, advance:3.1, rows:["VP.OH","NOLPI","IPH.L","PLONP",".dP.s"], incoming:["N.mLV",".rPl."]},
+  {name:"Back Door", speed:362, advance:3.4, rows:["LIP.O","AILVP","HVPOL","VP.NA","ds.PV"], incoming:[".mH.P","V.lPI","I.bOr"]},
+  {name:"Last Entry", speed:374, advance:3.7, rows:["PL.OA","HLPNP","LPVHL","PILPV","IVsPd"], incoming:[".lPLO","Vw.Hr",".VcLP"]},
+  {name:"The Queue", speed:388, advance:4.0, rows:["IPLA.","CPLON","PLOPV","HLVPC","dPsIV"], incoming:["b.CwP","Lm.AP","Irl.C"]},
+  {name:"Lock-In", speed:403, advance:4.3, rows:["CLVAI","VPIPL","OLPHC","PAIVL","IdPsV"], incoming:[".uPbI","Vm.HP","lVrCw"]},
+  {name:"No Guest List", speed:418, advance:4.7, rows:["CLPPI","LIOVA","VPIPL","HPALM","PsdVL"], incoming:["wMP.V","Pm.bO","lVPIr","IcHuP"]},
+  {name:"Peak Time", speed:435, advance:5.1, rows:["PVMLP","LPIOV","VPCLA","IPVPM","sPdPV"], incoming:["PmHbV","u.PwL","IVlAr","P.cMP"]},
+  {name:"System Pressure", speed:455, advance:5.5, rows:["APMCL","LPPVO","PVAPP","IPPML","LsdPP"], incoming:["mVPwI","OlPbV","PrMuP","PL.cC"]},
 ];
 const clubbers = {
   V:{sprite:"clubber-vip", color:BLUE},
   I:{sprite:"clubber-influencer", color:"#ff73b4"},
   P:{sprite:"clubber-puffer", color:"#fff2d5", hp:2},
   L:{sprite:"clubber-lime", color:LIME},
+  N:{sprite:"enemy-normie", color:"#c8cfd4", aspect:352/640},
+  H:{sprite:"enemy-neighbour", color:"#ff977f", aspect:352/640},
+  O:{sprite:"enemy-office", color:BLUE, aspect:352/640},
+  A:{sprite:"enemy-residents-chair", color:"#c696ed", aspect:352/640, hp:2},
+  C:{sprite:"enemy-promoter", color:"#ff9d86", aspect:352/640},
+  M:{sprite:"enemy-noise-inspector", color:AMBER, aspect:352/640},
 };
 const art = {};
 const djProfiles = new Map();
@@ -47,10 +53,6 @@ const releaseTime = throwFrames[3].start;
 const throwDuration = 430;
 for(const {sprite} of throwFrames) loadImage(sprite, "assets/sprites/frames/" + sprite + ".png");
 loadImage("alley", "assets/backgrounds/london-alley.webp");
-for(const name of ["dj-idle","dj-hit","clubber-vip","clubber-influencer","clubber-puffer","clubber-lime",
-  "vinyl","vinyl-charged","bonus-dubplate","bonus-stack","bonus-rewind","fx-impact"]) {
-  loadImage(name, "assets/sprites/" + name + ".png");
-}
 const tracks = [
   { title: "lowQ – Twilight", file: "lowQ - Twilight.mp3" },
   { title: "lowQ – Run from Babylon", file: "lowQ – Run from Babylon.mp3" },
@@ -64,13 +66,18 @@ const powerups = {
   d:{name:"Dubplate", note:"EXTRA VINYL", carrier:"V", sprite:"bonus-dubplate", color:BLUE},
   s:{name:"Stack", note:"WIDER DECK", carrier:"L", sprite:"bonus-stack", color:LIME, duration:14},
   r:{name:"Rewind", note:"SAVE ARMED", carrier:"I", sprite:"bonus-rewind", color:AMBER},
-  b:{name:"Brake", note:"SLOWER CROWD", carrier:"I", icon:"II", color:BLUE, duration:9},
-  c:{name:"Charge", note:"PRESSURE FULL", carrier:"L", icon:"+", color:LIME},
-  m:{name:"Half Size", note:"DJ SHRINKS", carrier:"P", icon:"½", color:"#ff85b8", duration:7, hazard:true},
-  l:{name:"Reverse", note:"LEFT AND RIGHT SWAPPED", carrier:"V", icon:"↔", color:"#ff85b8", duration:6, hazard:true},
-  w:{name:"Warp", note:"UNEVEN BOUNCES", carrier:"I", icon:"~", color:"#ff85b8", duration:8, hazard:true},
-  u:{name:"Rush", note:"FASTER CROWD", carrier:"L", icon:">>", color:"#ff85b8", duration:7, hazard:true},
+  b:{name:"Brake", note:"SLOWER CROWD", carrier:"H", sprite:"bonus-brake", icon:"II", color:BLUE, duration:9},
+  c:{name:"Charge", note:"PRESSURE FULL", carrier:"C", sprite:"bonus-charge", icon:"+", color:LIME},
+  m:{name:"Half Size", note:"DJ SHRINKS", carrier:"A", sprite:"hazard-half-size", icon:"½", color:"#ff85b8", duration:7, hazard:true},
+  l:{name:"Reverse", note:"LEFT AND RIGHT SWAPPED", carrier:"O", sprite:"hazard-reverse", icon:"↔", color:"#ff85b8", duration:6, hazard:true},
+  w:{name:"Warp", note:"UNEVEN BOUNCES", carrier:"N", sprite:"hazard-warp", icon:"~", color:"#ff85b8", duration:8, hazard:true},
+  u:{name:"Rush", note:"FASTER CROWD", carrier:"M", sprite:"hazard-rush", icon:">>", color:"#ff85b8", duration:7, hazard:true},
 };
+for(const name of ["dj-idle","dj-hit","vinyl","vinyl-charged","fx-impact",
+  ...Object.values(clubbers).map(({sprite})=>sprite),
+  ...Object.values(powerups).map(({sprite})=>sprite)]) {
+  loadImage(name, "assets/sprites/" + name + ".png");
+}
 const keys = new Set();
 const motion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const getBest = () => { try { return Number(localStorage.getItem("pressure-test-best")) || 0; } catch { return 0; } };
@@ -133,13 +140,16 @@ function placeClubber(enemy) {
   const spread = 15 + depth*121;
   const width = 17 + depth*53;
   enemy.visibility = clamp(distance/ENTRY_DEPTH,0,1);
-  const height = width*(enemy.kind === "P" ? 1.91 : 2.34)*spriteAspect;
+  const info = clubbers[enemy.kind];
+  const heightRatio = info.hp===2 ? 1.91 : 2.34;
+  const height = width*heightRatio*spriteAspect;
+  const drawWidth = info.aspect ? width*heightRatio*info.aspect : width;
   enemy.center = archX+(W/2-archX)*depth + (enemy.lane+enemy.stagger)*spread;
   enemy.w = width*.83;
   enemy.h = height*.88;
   enemy.x = enemy.center-enemy.w/2;
   enemy.y = enemy.feet-height*.94;
-  enemy.drawW = width;
+  enemy.drawW = drawWidth;
   enemy.drawH = height;
 }
 function addRow(row, feet) {
@@ -407,7 +417,7 @@ function hitClubber(ball, enemy, oldX, oldY) {
     crowd.splice(crowd.indexOf(enemy),1);
     if(enemy.bonus) drops.push({x:enemy.center,y:enemy.y+enemy.h/2,type:enemy.bonus});
     pressure = Math.min(6,pressure+1);
-    addScore(enemy.kind === "P" ? 180 : 100);
+    addScore(clubbers[enemy.kind].hp === 2 ? 180 : 100);
     if(pressure === 6 && !get("notice").textContent) announce("PRESSURE READY");
   } else {
     enemy.hp--;
@@ -538,7 +548,7 @@ function draw() {
   ctx.globalAlpha=1;
   for(const drop of drops) {
     const item = powerups[drop.type];
-    const w = 42, h = 31*spriteAspect;
+    const w = item.icon ? 34 : 42, h = (item.icon ? 34 : 31)*spriteAspect;
     if(item.sprite && sprite(item.sprite,drop.x-w/2,drop.y-h/2,w,h)) continue;
     ctx.save();
     ctx.translate(drop.x,drop.y);
