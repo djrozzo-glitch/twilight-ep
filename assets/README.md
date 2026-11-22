@@ -1,10 +1,26 @@
-# Twilight game assets
+# Twilight arcade assets
 
-- **Background** — `backgrounds/london-alley.webp` (1122 × 1402). Keep the alley centered when cropping.
-- **DJ** — `dj-idle.png` and `dj-hit.png` share the same framing. Anchor both frames at bottom center and align the deck's collision line once.
-- **Clubbers** — `clubber-vip.png`, `clubber-influencer.png`, `clubber-puffer.png` and `clubber-lime.png`. Anchor at bottom center. These are single stride poses. A walking cycle can use additional frames.
-- **Projectile** — `vinyl.png` and `vinyl-charged.png`. Anchor and rotate around the center.
-- **Bonuses and effects** — `bonus-dubplate.png`, `bonus-stack.png`, `bonus-rewind.png`, and `fx-impact.png`. Center the impact on the contact point.
-- **Source sheets** — Two RGBA sheets, each 1254 × 1254. Column boundaries at x=418 and x=836. Row divider at y=605 for characters and y=627 for items. Files in `sprites/` are already sliced with transparent padding.
+All images in `sprites/` are separate PNGs with transparent backgrounds.
+Both original sheets are included under `source-sheets/`.
 
-The art pack is separate from the game code.
+## Pickups
+256 × 256 px, centered anchor (128, 128). Cyan and lime indicate bonuses.
+Magenta diamonds indicate temporary hazards. Game effect tokens:
+
+- `b` Brake — bonus-brake.png
+- `c` Charge — bonus-charge.png
+- `m` Half Size — hazard-half-size.png
+- `l` Reverse — hazard-reverse.png
+- `w` Warp — hazard-warp.png
+- `u` Rush — hazard-rush.png
+
+## Characters
+352 × 640 px, bottom-center anchor at (176, 632). Use alpha bounds for
+collision dimensions if needed. Each is a single stride pose.
+
+- Normie — enemy-normie.png
+- Neighbour — enemy-neighbour.png
+- Office Commuter — enemy-office.png
+- Residents’ Chair — enemy-residents-chair.png
+- Club Promoter — enemy-promoter.png
+- Noise Inspector — enemy-noise-inspector.png
