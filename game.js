@@ -22,6 +22,18 @@ function loadImage(key, path) {
   image.src = path;
   art[key] = image;
 }
+// Frame names and timings match assets/sprites/dj-throw.json.
+const throwFrames = [
+  { sprite:"dj-00-idle", start:0 },
+  { sprite:"dj-01-pickup", start:0 },
+  { sprite:"dj-02-windup", start:80 },
+  { sprite:"dj-03-release", start:180 },
+  { sprite:"dj-04-follow-through", start:240 },
+  { sprite:"dj-05-recovery", start:330 },
+];
+const releaseTime = throwFrames[3].start;
+const throwDuration = 430;
+for(const {sprite} of throwFrames) loadImage(sprite, "assets/sprites/frames/" + sprite + ".png");
 loadImage("alley", "assets/backgrounds/london-alley.webp");
 for(const name of ["dj-idle","dj-hit","clubber-vip","clubber-influencer","clubber-puffer","clubber-lime",
   "vinyl","vinyl-charged","bonus-dubplate","bonus-stack","bonus-rewind","fx-impact"]) {
@@ -42,7 +54,7 @@ const motion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const getBest = () => { try { return Number(localStorage.getItem("pressure-test-best")) || 0; } catch { return 0; } };
 let best = getBest(), score = 0, level = 0, lives = 3, pressure = 0, mode = "menu", priorMode;
 let crowd = [], balls = [], drops = [], impacts = [], bat = W / 2, wide = 0, rewind = false;
-let flash = 0, time = 0, noticeUntil = 0, walkTime = 0, djHit = 0, spriteAspect = 1;
+let flash = 0, time = 0, noticeUntil = 0, walkTime = 0, throwElapsed = -1, spriteAspect = 1;
 let audio, master, sound = true;
 let pointer;
 
@@ -113,6 +125,7 @@ function loadWave() {
   }));
 }
 function ready() {
+  throwElapsed = -1;
   balls = [newBall(bat,PADDLE_Y-R-2)];
   balls[0].attached = true;
   setActive("ready");
@@ -128,20 +141,31 @@ function startGame() {
   loadTrack(0);
 }
 function startWave() {
-  pressure = 0; bat = W/2; wide = 0; rewind = false; drops = []; impacts = []; walkTime = 0; djHit = 0;
+  pressure = 0; bat = W/2; wide = 0; rewind = false; drops = []; impacts = []; walkTime = 0;
   loadWave();
   hud();
   ready();
 }
 function serve() {
-  if(mode !== "ready") return;
-  const ball = balls[0];
-  ball.x = bat;
-  ball.attached = false;
-  djHit = .18;
-  launch(ball,bat < W/2 ? .31 : -.31);
-  setActive("playing");
-  announce(stages[level].name.toUpperCase());
+  if(mode !== "ready" || throwElapsed >= 0) return;
+  throwElapsed = 0;
+  announce("");
+}
+function advanceThrow(dt) {
+  if(throwElapsed < 0) return;
+  throwElapsed += dt * 1000;
+  if(mode === "ready" && throwElapsed >= releaseTime) {
+    const ball = balls[0];
+    const width = paddleWidth();
+    // The hand in the release frame is above and to the right of the deck.
+    ball.x = clamp(bat + width*.46,LEFT+R,RIGHT-R);
+    ball.y = PADDLE_Y - width*.86*spriteAspect;
+    ball.attached = false;
+    launch(ball,bat < W/2 ? .31 : -.31);
+    setActive("playing");
+    announce(stages[level].name.toUpperCase());
+  }
+  if(throwElapsed >= throwDuration) throwElapsed = -1;
 }
 function launch(ball, angle) {
   const speed = stages[level].speed;
@@ -154,7 +178,7 @@ function hitBat(ball) {
   let angle = offset * 1.04;
   if(Math.abs(angle)<.13) angle = (angle || ball.vx || 1) < 0 ? -.13 : .13;
   launch(ball,angle);
-  djHit = .18;
+  throwElapsed = releaseTime;
   ball.y = PADDLE_Y-R-.1;
   if(pressure === 6) {
     ball.pierce = 4;
@@ -249,9 +273,9 @@ function update(dt) {
   if(time >= noticeUntil && get("notice").textContent) announce("",0);
   if(mode !== "ready" && mode !== "playing") return;
   flash = Math.max(0,flash-dt*2.4);
-  djHit = Math.max(0,djHit-dt);
   const direction = Number(keys.has("ArrowRight")||keys.has("KeyD"))-Number(keys.has("ArrowLeft")||keys.has("KeyA"));
   if(direction) bat = clamp(bat+direction*530*dt,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
+  advanceThrow(dt);
   if(mode === "ready") {balls[0].x = bat;return;}
   wide = Math.max(0,wide-dt);
   bat = clamp(bat,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
@@ -332,12 +356,21 @@ function drawClubber(enemy) {
   if(enemy.hp>1) rect(enemy.center-7,foot+3,14,2,info.color);
 }
 function drawDJ() {
-  const width = paddleWidth(), height = width*.87*spriteAspect;
-  const bottom = PADDLE_Y + height*.22;
-  if(!sprite(djHit>0?"dj-hit":"dj-idle",bat-width/2,bottom-height,width,height)) {
-    rect(bat-width/2,PADDLE_Y,width,13,"#555548");
+  const width = paddleWidth();
+  // Match the visible deck width to the paddle and pin the deck top to its bounce line.
+  const drawW = width*512/350, drawH = width*1.13*spriteAspect;
+  const frame = throwElapsed < 0 ? throwFrames[0] : throwFrames.findLast(({start})=>start<=throwElapsed);
+  if(!sprite(frame.sprite,bat-drawW/2,PADDLE_Y-drawH*425/512,drawW,drawH)) {
+    const legacyH = width*.87*spriteAspect;
+    if(!sprite(throwElapsed >= releaseTime?"dj-hit":"dj-idle",bat-width/2,PADDLE_Y-legacyH*.78,width,legacyH)) {
+      rect(bat-width/2,PADDLE_Y,width,13,"#555548");
+    }
   }
-  rect(bat-width/2+3,PADDLE_Y-1,width-6,2,pressure===6?LIME:rewind?AMBER:"#86deed");
+  if(pressure===6 || rewind) {
+    const trim = pressure===6?LIME:AMBER;
+    rect(bat-width/2+3,PADDLE_Y-1,16,2,trim);
+    rect(bat+width/2-19,PADDLE_Y-1,16,2,trim);
+  }
 }
 function draw() {
   ctx.setTransform(field.width/W,0,0,field.height/H,0,0);
@@ -357,6 +390,7 @@ function draw() {
   }
   drawDJ();
   for(const ball of balls) {
+    if(ball.attached && throwElapsed >= 0) continue;
     const size = R*2+4, height = size*spriteAspect;
     const name = ball.pierce ? "vinyl-charged" : "vinyl";
     if(sprite(name,ball.x-size/2,ball.y-height/2,size,height)) continue;
@@ -429,7 +463,7 @@ function togglePause() {
     setActive(priorMode);
     initAudio();
     syncMusic();
-    if(priorMode==="ready") announce("TAP OR PRESS SPACE TO LAUNCH",60);
+    if(priorMode==="ready" && throwElapsed < 0) announce("TAP OR PRESS SPACE TO LAUNCH",60);
     return;
   }
   if(mode!=="playing" && mode!=="ready") return;
