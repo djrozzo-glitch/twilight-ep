@@ -1,0 +1,36 @@
+{
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "anchor": {
+    "x": 256,
+    "y": 495
+  },
+  "deckTopY": 425,
+  "releaseFrame": "frames/dj-03-release.png",
+  "frames": [
+    {
+      "file": "frames/dj-00-idle.png",
+      "durationMs": 0
+    },
+    {
+      "file": "frames/dj-01-pickup.png",
+      "durationMs": 80
+    },
+    {
+      "file": "frames/dj-02-windup.png",
+      "durationMs": 100
+    },
+    {
+      "file": "frames/dj-03-release.png",
+      "durationMs": 60
+    },
+    {
+      "file": "frames/dj-04-follow-through.png",
+      "durationMs": 90
+    },
+    {
+      "file": "frames/dj-05-recovery.png",
+      "durationMs": 100
+    }
+  ]
+}
