@@ -1,0 +1,34 @@
+:root{color-scheme:dark;--ash:#181817;--ink:#121211;--line:#393733;--lime:#e2fc75;--orange:#ff925c;--muted:#aaa59b;font-family:"IBM Plex Mono",ui-monospace,monospace;background:#191818;color:#f0eee7}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:clamp(8px,2.5vw,32px);background:radial-gradient(ellipse at 45% 35%,#492b23 0,#261c1b 38%,#171616 75%)}
+.cabinet{width:min(100%,760px);padding:clamp(8px,2vw,18px);background:var(--ash);border:1px solid #514640;box-shadow:0 22px 90px #090605a9}
+.mast,.foot{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.mast{padding:3px 0 13px}
+.brand{display:flex;gap:9px;align-items:center;font-size:clamp(9px,2.5vw,12px);letter-spacing:.1em;line-height:1.22;color:#c7c1b5}
+.brand strong{color:#f4f0e4}
+.signal{width:35px;height:32px;background:var(--lime);display:flex;align-items:center;justify-content:center;gap:2px;transform:skewX(-7deg);flex:none}
+.signal i{width:3px;height:12px;background:#1a1b13}.signal i:nth-child(2n){height:20px}.signal i:nth-child(3){height:25px}
+.tools{display:flex;gap:6px}
+button{font:700 .75rem/1 ui-monospace,monospace;color:#f0eee7;background:#22211f;border:1px solid #5c514a;border-radius:0;min-height:38px;padding:0 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--lime);color:var(--lime)}button:disabled{opacity:.48;cursor:default}button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.hud{display:grid;grid-template-columns:.82fr 1fr 1.5fr .65fr;border:1px solid var(--line);background:#1d1c1a;margin-bottom:7px}
+.hud>div{padding:7px clamp(5px,2vw,15px);border-right:1px solid var(--line);min-width:0}.hud>div:last-child{border:0}
+.hud span{display:block;font-size:clamp(9px,2.2vw,12px);letter-spacing:.1em;text-transform:uppercase;color:#b8b1a5;margin-bottom:3px}
+.hud strong{display:block;white-space:nowrap;font-size:clamp(12px,3.3vw,18px)}
+#lives{color:var(--orange);letter-spacing:-.07em}
+#pressure{display:flex;gap:3px;margin-top:6px;height:10px}
+#pressure i{flex:1;background:#37352a}#pressure i.on{background:var(--lime)}#pressure.full i{box-shadow:0 0 6px #dfff82aa}
+.stage{position:relative;height:clamp(365px,calc(100dvh - 179px),615px);border:1px solid #62493f;overflow:hidden;background:#261714;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:14px;background:linear-gradient(180deg,#15110d62,#13100ded)}
+.overlay[hidden]{display:none}
+.panel{width:min(100%,500px);text-align:center;display:flex;align-items:center;flex-direction:column}
+.kicker{font-size:.75rem;font-weight:700;letter-spacing:.25em;color:var(--orange);margin-bottom:14px}
+h1{font-family:"Archivo Black","Arial Black",Impact,sans-serif;font-size:clamp(46px,11vw,110px);font-weight:1000;line-height:.79;letter-spacing:-.09em;margin:0 0 14px;color:#f0ede3;text-shadow:0 4px 0 #110c0a;text-wrap:balance}
+h1 span{color:var(--lime)}.panel h1.compact{font-size:clamp(38px,8vw,74px);line-height:.9}
+p{color:#dfd9cd;line-height:1.5;font-size:clamp(.75rem,2.6vw,.9rem);margin:6px 0 16px}
+.action{min-height:48px;padding:0 25px;color:#151713;background:var(--lime);border:1px solid var(--lime);font-size:.95rem;box-shadow:4px 4px 0 #819042;text-transform:uppercase}.action:hover:not(:disabled){color:#151713;background:#f6ffcf}
+small{margin-top:14px;color:#c0b9a9;font-size:.7rem}
+.notice{position:absolute;pointer-events:none;left:0;right:0;top:59%;text-align:center;font-size:clamp(13px,3.6vw,22px);font-weight:bold;letter-spacing:.1em;color:var(--lime);text-shadow:0 2px 2px #000,0 0 12px #000}
+.foot{padding-top:10px;font-size:clamp(10px,2.5vw,12px);color:#aea79b;letter-spacing:.05em;text-transform:uppercase}.foot b{color:var(--orange)}.foot strong{color:#ebe8dd}.divider{color:#80766a;padding:0 4px}
+@media(max-height:640px) and (orientation:landscape){body{padding:6px}.cabinet{padding:7px}.mast{padding-bottom:5px}.stage{height:max(245px,calc(100dvh - 120px))}.foot{padding-top:5px}.panel h1{font-size:52px}.kicker{margin-bottom:10px}}
