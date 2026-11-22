@@ -5,18 +5,21 @@ const touchStrip = get("touch-strip");
 const ctx = field.getContext("2d");
 const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, BREACH_Y = 474, R = 10;
 const DJ_BOTTOM = H - 4, DJ_DECK_ROW = 425/512, DJ_BOTTOM_ROW = 496/512;
+// The entrance is the ground under the arch in london-alley.webp.
+const ALLEY_W = 1122, ALLEY_H = 1402, ARCH_X = .505, ARCH_Y = .446;
+const FRONT_ROW_Y = 402, ENTRY_DEPTH = 20;
 const LIME = "#e2fc75", AMBER = "#ff9c61", BLUE = "#9fe1f1";
 const stages = [
-  {name:"The Arch", speed:326, advance:2.5, interval:10, rows:[".V.I.","d.V.s"], incoming:[".L.P.","I.r.V"]},
-  {name:"Side Street", speed:338, advance:2.8, interval:9.5, rows:[".I.P.","Vs.Vd"], incoming:["I.b.L",".V.rP"]},
-  {name:"Soundcheck", speed:350, advance:3.1, interval:9, rows:["VP.IL",".dP.s"], incoming:["I.m.V",".rPl."]},
-  {name:"Back Door", speed:362, advance:3.4, interval:8.5, rows:["LIP.V","ds.PV"], incoming:[".mI.P","V.l.I","I.bPr"]},
-  {name:"Last Entry", speed:374, advance:3.7, interval:8, rows:["PL.IV","IVsPd"], incoming:[".lP.I","Vw.Ir",".VcLP"]},
-  {name:"The Queue", speed:388, advance:4.0, interval:7.5, rows:["IPLV.","dPsIV"], incoming:["b.VwP","Lm.PV","Irl.L"]},
-  {name:"Lock-In", speed:403, advance:4.3, interval:7, rows:["PLVPI","IdPsV"], incoming:[".uPbI","Vm.LP","lVrPw"]},
-  {name:"No Guest List", speed:418, advance:4.7, interval:6.8, rows:["VLPPI","PsdVL"], incoming:["wIP.V","Pm.bI","lVPIr","IcLuP"]},
-  {name:"Peak Time", speed:435, advance:5.1, interval:6.3, rows:["PVILP","sPdPV"], incoming:["PmIbV","u.PwL","IVlPr","P.cVP"]},
-  {name:"System Pressure", speed:455, advance:5.5, interval:6, rows:["PPIVL","LsdPP"], incoming:["mVPwI","IlPbV","PrVuP","PL.cI"]},
+  {name:"The Arch", speed:326, advance:2.5, rows:["VI.LV","ILVP.","IVLVI",".VILV","d.V.s"], incoming:[".LVP.","I.r.V"]},
+  {name:"Side Street", speed:338, advance:2.8, rows:["I.VPL","PIVL.","VILVP",".IVPL","Vs.Vd"], incoming:["I.bVL",".V.rP"]},
+  {name:"Soundcheck", speed:350, advance:3.1, rows:["VP.IL","VILPI","IPV.L","PLIVP",".dP.s"], incoming:["I.mLV",".rPl."]},
+  {name:"Back Door", speed:362, advance:3.4, rows:["LIP.V","PILVP","IVPIL","VP.IL","ds.PV"], incoming:[".mI.P","V.lPI","I.bPr"]},
+  {name:"Last Entry", speed:374, advance:3.7, rows:["PL.IV","ILPVP","LPVIL","PILPV","IVsPd"], incoming:[".lPLI","Vw.Ir",".VcLP"]},
+  {name:"The Queue", speed:388, advance:4.0, rows:["IPLV.","VPLPI","PLIPV","ILVPP","dPsIV"], incoming:["b.VwP","Lm.PV","Irl.L"]},
+  {name:"Lock-In", speed:403, advance:4.3, rows:["PLVPI","VPIPL","ILPVP","PPIVL","IdPsV"], incoming:[".uPbI","Vm.LP","lVrPw"]},
+  {name:"No Guest List", speed:418, advance:4.7, rows:["VLPPI","LIPVP","VPIPL","IPPLV","PsdVL"], incoming:["wIP.V","Pm.bI","lVPIr","IcLuP"]},
+  {name:"Peak Time", speed:435, advance:5.1, rows:["PVILP","LPIPV","VPPLI","IPVPP","sPdPV"], incoming:["PmIbV","u.PwL","IVlPr","P.cVP"]},
+  {name:"System Pressure", speed:455, advance:5.5, rows:["PPIVL","LPPVI","PVPPP","IPPVL","LsdPP"], incoming:["mVPwI","IlPbV","PrVuP","PL.cI"]},
 ];
 const clubbers = {
   V:{sprite:"clubber-vip", color:BLUE},
@@ -73,7 +76,8 @@ const motion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const getBest = () => { try { return Number(localStorage.getItem("pressure-test-best")) || 0; } catch { return 0; } };
 let best = getBest(), score = 0, level = 0, lives = 3, pressure = 0, mode = "menu", priorMode;
 let crowd = [], balls = [], drops = [], impacts = [], bat = W / 2, wide = 0, rewind = false;
-let incomingRows = [], arrivalTime = 0, brake = 0, hazard = null, hazardTime = 0, warpDirection = 1;
+let incomingRows = [], rowCount = 0, brake = 0, hazard = null, hazardTime = 0, warpDirection = 1;
+let alleyCrop, archX = W*ARCH_X, archY = H*ARCH_Y;
 const incomingStatus = get("incoming");
 const effectStatus = get("effects");
 let flash = 0, time = 0, noticeUntil = 0, walkTime = 0, throwElapsed = -1, spriteAspect = 1;
@@ -124,11 +128,13 @@ function setActive(kind) {
   get("pause").textContent = "Pause";
 }
 function placeClubber(enemy) {
-  const depth = clamp((enemy.feet-240)/(BREACH_Y-240),0,1);
-  const spread = 38 + depth*98;
-  const width = 32 + depth*38;
+  const distance = Math.max(0,enemy.feet-archY);
+  const depth = clamp(distance/(BREACH_Y-archY),0,1);
+  const spread = 15 + depth*121;
+  const width = 17 + depth*53;
+  enemy.visibility = clamp(distance/ENTRY_DEPTH,0,1);
   const height = width*(enemy.kind === "P" ? 1.91 : 2.34)*spriteAspect;
-  enemy.center = W/2 + enemy.lane*spread;
+  enemy.center = archX+(W/2-archX)*depth + (enemy.lane+enemy.stagger)*spread;
   enemy.w = width*.83;
   enemy.h = height*.88;
   enemy.x = enemy.center-enemy.w/2;
@@ -137,32 +143,34 @@ function placeClubber(enemy) {
   enemy.drawH = height;
 }
 function addRow(row, feet) {
+  const stagger = rowCount++ % 2 ? .16 : -.16;
   for(const [lane,token] of [...row].entries()) {
     if(token === ".") continue;
     const item = powerups[token];
     const kind = item?.carrier ?? token;
-    const enemy = {kind,lane:lane-2,feet,hp:clubbers[kind].hp ?? 1,
+    const enemy = {kind,lane:lane-2,stagger,feet,hp:clubbers[kind].hp ?? 1,
       bonus:item ? token : null,phase:lane*1.8+feet*.03,hurt:0};
     placeClubber(enemy);
     crowd.push(enemy);
   }
 }
+function rowSpacing() {
+  return (FRONT_ROW_Y-archY-ENTRY_DEPTH)/(stages[level].rows.length-1);
+}
 function loadWave() {
   const stage = stages[level];
   crowd = [];
-  stage.rows.forEach((row,index)=>addRow(row,242+index*48));
+  rowCount = 0;
+  stage.rows.forEach((row,index)=>addRow(row,archY+ENTRY_DEPTH+index*rowSpacing()));
   incomingRows = [...stage.incoming];
-  arrivalTime = stage.interval;
   incomingStatus.textContent = `Incoming rows ${incomingRows.length}`;
 }
-function reinforce(dt) {
+function reinforce() {
   if(!incomingRows.length) return;
-  arrivalTime -= dt;
-  if(arrivalTime > 0 && crowd.length) return;
-  // The next row enters behind the current crowd, with at least one row of separation.
-  const back = crowd.reduce((feet,enemy)=>Math.min(feet,enemy.feet),250);
-  addRow(incomingRows.shift(),Math.min(222,back-44));
-  arrivalTime = stages[level].interval;
+  const back = crowd.reduce((feet,enemy)=>Math.min(feet,enemy.feet),BREACH_Y);
+  if(back < archY+rowSpacing()) return;
+  addRow(incomingRows.shift(),archY);
+  crowd.sort((a,b)=>a.feet-b.feet);
   incomingStatus.textContent = `Incoming rows ${incomingRows.length}`;
 }
 function updateEffects(dt) {
@@ -329,11 +337,9 @@ function waveCleared() {
 }
 function loseBall(breach = false) {
   if(breach) {
-    const safeRow = Array(5).fill(330);
-    for(const enemy of [...crowd].sort((a,b)=>b.feet-a.feet)) {
-      const lane = enemy.lane+2;
-      enemy.feet = Math.min(enemy.feet,safeRow[lane]);
-      safeRow[lane] = enemy.feet-38;
+    const setback = (330-archY)/(BREACH_Y-archY);
+    for(const enemy of crowd) {
+      enemy.feet = archY+(enemy.feet-archY)*setback;
       placeClubber(enemy);
     }
     flash = .42;
@@ -420,7 +426,7 @@ function update(dt) {
   advanceThrow(dt);
   if(mode === "ready") {balls[0].x = bat;balls[0].y = readyBallY();return;}
   updateEffects(dt);
-  reinforce(dt);
+  reinforce();
   bat = clamp(bat,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
   const crowdRate = (brake ? .55 : 1) * (hazard === "u" ? 1.55 : 1);
   walkTime += dt*crowdRate;
@@ -445,6 +451,7 @@ function update(dt) {
       continue;
     }
     const enemy = crowd.find(b=>{
+      if(b.visibility < .25) return false;
       const dx = ball.x-clamp(ball.x,b.x,b.x+b.w), dy = ball.y-clamp(ball.y,b.y,b.y+b.h);
       return dx*dx+dy*dy<=R*R;
     });
@@ -478,13 +485,14 @@ function background() {
   rect(0,0,W,H,"#141a27");
   const image = art.alley;
   if(!imageReady(image)) return;
-  const aspect = field.width/field.height;
-  const sw = Math.min(image.naturalWidth,image.naturalHeight*aspect);
-  const sh = Math.min(image.naturalHeight,image.naturalWidth/aspect);
-  ctx.drawImage(image,(image.naturalWidth-sw)/2,(image.naturalHeight-sh)*.4,sw,sh,0,0,W,H);
+  const {x,y,w,h} = alleyCrop;
+  ctx.drawImage(image,x,y,w,h,0,0,W,H);
   rect(0,0,W,H,"#0c10142a");
 }
 function drawClubber(enemy) {
+  if(enemy.visibility <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = enemy.visibility;
   const info = clubbers[enemy.kind];
   const step = walkTime*7.1+enemy.phase;
   const active = mode === "playing" && !motion;
@@ -504,6 +512,7 @@ function drawClubber(enemy) {
   }
   ctx.shadowBlur = 0;
   if(enemy.hp>1) rect(enemy.center-7,foot+3,14,2,info.color);
+  ctx.restore();
 }
 function drawDJ() {
   const dj = djBounds();
@@ -564,7 +573,18 @@ function resize() {
   field.width=Math.max(1,Math.round(box.width*dpr));
   field.height=Math.max(1,Math.round(box.height*dpr));
   spriteAspect = clamp((field.width/W)/(field.height/H),.5,1.18);
-  crowd.forEach(placeClubber);
+  const aspect = field.width/field.height;
+  const w = Math.min(ALLEY_W,ALLEY_H*aspect);
+  const h = Math.min(ALLEY_H,ALLEY_W/aspect);
+  alleyCrop = {x:(ALLEY_W-w)/2,y:(ALLEY_H-h)*ARCH_Y,w,h};
+  const previousArch = archY;
+  archX = (ALLEY_W*ARCH_X-alleyCrop.x)*W/w;
+  archY = (ALLEY_H*ARCH_Y-alleyCrop.y)*H/h;
+  for(const enemy of crowd) {
+    const progress = (enemy.feet-previousArch)/(BREACH_Y-previousArch);
+    enemy.feet = archY+progress*(BREACH_Y-archY);
+    placeClubber(enemy);
+  }
 }
 function initAudio() {
   if(!sound) return;
@@ -695,9 +715,9 @@ document.addEventListener("visibilitychange",()=>{
   else syncMusic();
 });
 new ResizeObserver(resize).observe(field);
+resize();
 loadWave();
 hud();
-resize();
 let last=performance.now(), lag=0;
 function frame(now) {
   lag+=Math.min(.06,(now-last)/1000);
