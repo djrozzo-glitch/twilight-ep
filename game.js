@@ -1,6 +1,7 @@
 "use strict";
 const get = id => document.getElementById(id);
 const field = get("field");
+const touchStrip = get("touch-strip");
 const ctx = field.getContext("2d");
 const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, BREACH_Y = 474, R = 10;
 const DJ_BOTTOM = H - 4, DJ_DECK_ROW = 425/512, DJ_BOTTOM_ROW = 496/512;
@@ -86,6 +87,7 @@ function show(kind, kicker, title, message, action, hint = "") {
   mode = kind;
   announce("",0);
   get("overlay").hidden = false;
+  touchStrip.disabled = true;
   get("kicker").textContent = kicker;
   get("title").textContent = title;
   get("title").classList.add("compact");
@@ -98,6 +100,7 @@ function show(kind, kicker, title, message, action, hint = "") {
 function setActive(kind) {
   mode = kind;
   get("overlay").hidden = true;
+  touchStrip.disabled = false;
   get("pause").disabled = false;
   get("pause").textContent = "Pause";
 }
@@ -131,7 +134,7 @@ function ready() {
   balls = [newBall(bat,readyBallY())];
   balls[0].attached = true;
   setActive("ready");
-  announce("TAP OR PRESS SPACE TO LAUNCH",60);
+  announce("TAP BELOW OR PRESS SPACE TO LAUNCH",60);
 }
 function newBall(x,y) {return {x,y,vx:0,vy:0,pierce:0,attached:false};}
 function startGame() {
@@ -290,7 +293,7 @@ function loseBall(breach = false) {
     return;
   }
   ready();
-  announce(`${breach ? "CROWD REACHED THE DECK · " : ""}${lives} ${lives === 1 ? "LIFE" : "LIVES"} LEFT · TAP TO LAUNCH`,8);
+  announce(`${breach ? "CROWD REACHED THE DECK · " : ""}${lives} ${lives === 1 ? "LIFE" : "LIVES"} LEFT · TAP BELOW TO LAUNCH`,8);
 }
 function collect(type) {
   if(type === "s") wide = 14;
@@ -527,7 +530,7 @@ function togglePause() {
     setActive(priorMode);
     initAudio();
     syncMusic();
-    if(priorMode==="ready" && throwElapsed < 0) announce("TAP OR PRESS SPACE TO LAUNCH",60);
+    if(priorMode==="ready" && throwElapsed < 0) announce("TAP BELOW OR PRESS SPACE TO LAUNCH",60);
     return;
   }
   if(mode!=="playing" && mode!=="ready") return;
@@ -543,23 +546,35 @@ function action() {
   else if(["menu","lost","won"].includes(mode)) startGame();
 }
 function movePointer(event) {
-  const box=field.getBoundingClientRect();
-  bat=clamp((event.clientX-box.left)*W/box.width,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
+  const box = event.currentTarget.getBoundingClientRect();
+  bat = clamp((event.clientX-box.left)*W/box.width,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
 }
-field.addEventListener("pointerdown",event=>{
-  if(pointer !== undefined || !["ready","playing"].includes(mode)) return;
-  pointer=event.pointerId;
-  field.setPointerCapture(pointer);
-  movePointer(event);
+function serveFromInput() {
   initAudio();
   if(music.paused) syncMusic();
   serve();
+}
+for(const surface of [field,touchStrip]) {
+  surface.addEventListener("pointerdown",event=>{
+    if(event.button !== 0 || pointer !== undefined || !["ready","playing"].includes(mode)) return;
+    pointer = event.pointerId;
+    surface.setPointerCapture(pointer);
+    movePointer(event);
+    serveFromInput();
+  });
+  surface.addEventListener("pointermove",event=>{
+    if(!["ready","playing"].includes(mode)) return;
+    if(event.pointerId === pointer || (pointer === undefined && surface === field && event.pointerType === "mouse")) {
+      movePointer(event);
+    }
+  });
+  surface.addEventListener("lostpointercapture",event=>{
+    if(pointer === event.pointerId) pointer = undefined;
+  });
+}
+touchStrip.addEventListener("click",event=>{
+  if(event.detail === 0) serveFromInput();
 });
-field.addEventListener("pointermove",event=>{
-  if(!["ready","playing"].includes(mode)) return;
-  if(event.pointerType==="mouse" || event.pointerId===pointer) movePointer(event);
-});
-field.addEventListener("lostpointercapture",event=>{if(pointer===event.pointerId) pointer=undefined;});
 get("action").addEventListener("click",action);
 get("pause").addEventListener("click",togglePause);
 get("sound").addEventListener("click",()=>{
@@ -578,7 +593,7 @@ window.addEventListener("keydown",event=>{
   }
   if(event.repeat) return;
   if(event.code==="KeyP" || event.code==="Escape") {togglePause();return;}
-  if(event.code==="Space" && mode==="ready") {event.preventDefault();initAudio();if(music.paused) syncMusic();serve();}
+  if(event.code==="Space" && mode==="ready") {event.preventDefault();serveFromInput();}
 });
 window.addEventListener("keyup",event=>keys.delete(event.code));
 window.addEventListener("blur",()=>keys.clear());

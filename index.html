@@ -14,6 +14,13 @@
   <header class="mast">
     <div class="brand"><span class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span>SOUTH LONDON<br><strong>SOUND SYSTEM</strong></span></div>
     <div class="tools"><button id="sound" aria-pressed="true">Sound on</button><button id="pause" disabled>Pause</button></div>
+    <div class="release">
+      <div class="release-credit">
+        <span class="release-label">Shifted</span>
+        <span id="track" aria-live="polite">Twilight EP · lowQ</span>
+      </div>
+      <span class="best">BEST <strong id="best">00000</strong></span>
+    </div>
   </header>
   <div class="hud" aria-label="Game status">
     <div><span>Wave</span><strong id="level">01 / 03</strong></div>
@@ -22,19 +29,23 @@
     <div><span>Lives</span><strong id="lives" aria-label="3 lives">● ● ●</strong></div>
   </div>
   <section class="stage" aria-label="Playing field">
-    <canvas id="field" width="640" height="570" aria-label="Move the DJ with touch, mouse, or arrow keys. Bounce the record into the advancing crowd."></canvas>
+    <canvas id="field" width="640" height="570" aria-label="Bounce the record into the advancing crowd. Move the DJ with the touch strip below, mouse, or arrow keys."></canvas>
     <div class="overlay" id="overlay">
       <div class="panel">
         <div class="kicker" id="kicker">BASS ARCADE</div>
         <h1 id="title">TWILIGHT<span>.</span></h1>
         <p id="message">Bounce the record into the crowd.<br>Keep three waves away from the decks.</p>
         <button class="action" id="action">Start game</button>
-        <small id="hint">Touch · Mouse · Arrow keys</small>
+        <small id="hint">Touch strip · Mouse · Arrow keys</small>
       </div>
     </div>
     <div class="notice" id="notice" aria-live="polite"></div>
   </section>
-  <footer class="foot"><span><b aria-hidden="true">◉</b> <span id="track" aria-live="polite">Twilight EP · lowQ</span></span><span class="best">BEST <strong id="best">00000</strong></span></footer>
+  <button class="touch-strip" id="touch-strip" type="button" aria-label="Launch vinyl. Drag horizontally here to move the DJ." disabled>
+    <span class="touch-grip" aria-hidden="true"></span>
+    <span>Tap to launch <span class="touch-separator" aria-hidden="true">·</span> Drag to move</span>
+    <span class="touch-grip" aria-hidden="true"></span>
+  </button>
 </main>
 </body>
 </html>

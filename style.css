@@ -2,8 +2,13 @@
 *{box-sizing:border-box}
 body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:clamp(8px,2.5vw,32px);background:radial-gradient(ellipse at 45% 35%,#492b23 0,#261c1b 38%,#171616 75%)}
 .cabinet{width:min(100%,760px);padding:clamp(8px,2vw,18px);background:var(--ash);border:1px solid #514640;box-shadow:0 22px 90px #090605a9}
-.mast,.foot{display:flex;align-items:center;justify-content:space-between;gap:9px}
-.mast{padding:3px 0 13px}
+.mast{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 9px;padding:3px 0 8px}
+.release,.release-credit{display:flex;align-items:center;gap:8px;min-width:0}
+.release{grid-column:1/-1;justify-content:space-between;border-top:1px solid var(--line);padding:8px 0 0}
+.release-label{color:var(--orange);font-size:.69rem;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+#track{color:#f4f0e4;font-weight:700;font-size:clamp(.74rem,2.8vw,.875rem);overflow-wrap:anywhere}
+.best{color:var(--muted);font-size:clamp(.625rem,2.6vw,.75rem);white-space:nowrap}
+.best strong{color:#ebe8dd}
 .brand{display:flex;gap:9px;align-items:center;font-size:clamp(9px,2.5vw,12px);letter-spacing:.1em;line-height:1.22;color:#c7c1b5}
 .brand strong{color:#f4f0e4}
 .signal{width:35px;height:32px;background:var(--lime);display:flex;align-items:center;justify-content:center;gap:2px;transform:skewX(-7deg);flex:none}
@@ -18,7 +23,7 @@ button:hover:not(:disabled){border-color:var(--lime);color:var(--lime)}button:di
 #lives{color:var(--orange);letter-spacing:-.07em}
 #pressure{display:flex;gap:3px;margin-top:6px;height:10px}
 #pressure i{flex:1;background:#37352a}#pressure i.on{background:var(--lime)}#pressure.full i{box-shadow:0 0 6px #dfff82aa}
-.stage{position:relative;height:clamp(365px,calc(100dvh - 179px),615px);border:1px solid #62493f;overflow:hidden;background:#261714;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage{position:relative;height:clamp(280px,calc(100dvh - 235px),615px);border:1px solid #62493f;overflow:hidden;background:#261714;touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{display:block;width:100%;height:100%;touch-action:none}
 .overlay{position:absolute;inset:0;display:grid;place-items:center;padding:14px;background:linear-gradient(180deg,#15110d62,#13100ded)}
 .overlay[hidden]{display:none}
@@ -30,5 +35,8 @@ p{color:#dfd9cd;line-height:1.5;font-size:clamp(.75rem,2.6vw,.9rem);margin:6px 0
 .action{min-height:48px;padding:0 25px;color:#151713;background:var(--lime);border:1px solid var(--lime);font-size:.95rem;box-shadow:4px 4px 0 #819042;text-transform:uppercase}.action:hover:not(:disabled){color:#151713;background:#f6ffcf}
 small{margin-top:14px;color:#c0b9a9;font-size:.7rem}
 .notice{position:absolute;pointer-events:none;left:0;right:0;top:59%;text-align:center;font-size:clamp(13px,3.6vw,22px);font-weight:bold;letter-spacing:.1em;color:var(--lime);text-shadow:0 2px 2px #000,0 0 12px #000}
-.foot{padding-top:10px;font-size:clamp(10px,2.5vw,12px);color:#aea79b;letter-spacing:.05em;text-transform:uppercase}.foot b{color:var(--orange)}.foot strong{color:#ebe8dd}.foot .best{white-space:nowrap}.foot #track{text-transform:none}
-@media(max-height:640px) and (orientation:landscape){body{padding:6px}.cabinet{padding:7px}.mast{padding-bottom:5px}.stage{height:max(245px,calc(100dvh - 120px))}.foot{padding-top:5px}.panel h1{font-size:52px}.kicker{margin-bottom:10px}}
+.touch-strip{width:100%;min-height:50px;margin-top:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-color:#51493a;color:#e4dfd2;background:#211f1a;font-size:clamp(.66rem,2.8vw,.8rem);touch-action:none;user-select:none;-webkit-user-select:none;cursor:ew-resize}
+.touch-strip:active:not(:disabled){border-color:var(--lime);background:#2b2c1e}
+.touch-separator{color:var(--orange);margin:0 .24em}
+.touch-grip{width:16px;height:12px;flex:none;background:repeating-linear-gradient(90deg,#8b836e 0 2px,transparent 2px 5px)}
+@media(max-height:640px) and (orientation:landscape){body{padding:6px}.cabinet{padding:7px}.mast{gap:5px;padding:0 0 5px}.release{padding-top:5px}.stage{height:max(195px,calc(100dvh - 180px))}.touch-strip{min-height:44px}.panel h1{font-size:52px}.kicker{margin-bottom:10px}}
