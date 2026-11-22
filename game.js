@@ -2,13 +2,31 @@
 const get = id => document.getElementById(id);
 const field = get("field");
 const ctx = field.getContext("2d");
-const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, PADDLE_Y = 520, R = 8;
+const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, PADDLE_Y = 520, BREACH_Y = 474, R = 10;
 const LIME = "#e2fc75", AMBER = "#ff9c61", BLUE = "#9fe1f1";
 const stages = [
-  { name: "The Arch", speed: 320, rows: ["..o##o..",".######.","########","##s##d##",".###r##."] },
-  { name: "Soundcheck", speed: 352, rows: [".oo..oo.","oo####oo","#s#oo#d#",".##..##.","####r###","..####.."] },
-  { name: "System Pressure", speed: 380, rows: ["ooo##ooo","o##oo##o","##d##s##","o##oo##o","##r#####",".######."] },
+  { name:"The Arch", speed:327, advance:2.55, rows:[".V.I.", "I.P.L", "dVrLs"] },
+  { name:"Soundcheck", speed:354, advance:2.95, rows:[".P.P.", "VL.IV", "IPPLV", "LsdrI"] },
+  { name:"System Pressure", speed:380, advance:3.6, rows:["PL.IV", "IPLVI", "VPILP", "rIdPs"] },
 ];
+const clubbers = {
+  V:{sprite:"clubber-vip", color:BLUE},
+  I:{sprite:"clubber-influencer", color:"#ff73b4"},
+  P:{sprite:"clubber-puffer", color:"#fff2d5", hp:2},
+  L:{sprite:"clubber-lime", color:LIME},
+};
+const bonusCarriers = {d:"V", s:"L", r:"I"};
+const art = {};
+function loadImage(key, path) {
+  const image = new Image();
+  image.src = path;
+  art[key] = image;
+}
+loadImage("alley", "assets/backgrounds/london-alley.webp");
+for(const name of ["dj-idle","dj-hit","clubber-vip","clubber-influencer","clubber-puffer","clubber-lime",
+  "vinyl","vinyl-charged","bonus-dubplate","bonus-stack","bonus-rewind","fx-impact"]) {
+  loadImage(name, "assets/sprites/" + name + ".png");
+}
 const tracks = [
   { title: "lowQ – Twilight", file: "lowQ - Twilight.mp3" },
   { title: "lowQ – Run from Babylon", file: "lowQ – Run from Babylon.mp3" },
@@ -18,15 +36,15 @@ music.preload = "none";
 music.volume = .8;
 let trackIndex = 0;
 let failedTracks = 0;
-const powerups = {d:{name:"DUBPLATE",color:BLUE},s:{name:"STACK",color:LIME},r:{name:"REWIND",color:AMBER}};
+const powerups = {d:{name:"DUBPLATE",sprite:"bonus-dubplate",color:BLUE},s:{name:"STACK",sprite:"bonus-stack",color:LIME},r:{name:"REWIND",sprite:"bonus-rewind",color:AMBER}};
 const keys = new Set();
 const motion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const getBest = () => { try { return Number(localStorage.getItem("pressure-test-best")) || 0; } catch { return 0; } };
 let best = getBest(), score = 0, level = 0, lives = 3, pressure = 0, mode = "menu", priorMode;
-let bricks = [], balls = [], drops = [], sparks = [], bat = W / 2, wide = 0, rewind = false;
-let flash = 0, time = 0, noticeUntil = 0;
+let crowd = [], balls = [], drops = [], impacts = [], bat = W / 2, wide = 0, rewind = false;
+let flash = 0, time = 0, noticeUntil = 0, walkTime = 0, djHit = 0, spriteAspect = 1;
 let audio, master, sound = true;
-let pointer, backdrop;
+let pointer;
 
 function rect(x,y,w,h,color) {ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function clamp(v,min,max) {return Math.max(min,Math.min(max,v));}
@@ -69,10 +87,29 @@ function setActive(kind) {
   get("pause").disabled = false;
   get("pause").textContent = "Pause";
 }
-function loadWall() {
-  bricks = stages[level].rows.flatMap((row,r)=>[...row].flatMap((type,c)=>{
-    if(type === ".") return [];
-    return [{x:38+c*71+(r%2?5:0),y:88+r*36,w:66,h:29,type,hp:type==="o"?2:1,seed:r*8+c}];
+function placeClubber(enemy) {
+  const depth = clamp((enemy.feet-240)/(BREACH_Y-240),0,1);
+  const spread = 38 + depth*98;
+  const width = 32 + depth*38;
+  const height = width*(enemy.kind === "P" ? 1.91 : 2.34)*spriteAspect;
+  enemy.center = W/2 + enemy.lane*spread;
+  enemy.w = width*.83;
+  enemy.h = height*.88;
+  enemy.x = enemy.center-enemy.w/2;
+  enemy.y = enemy.feet-height*.94;
+  enemy.drawW = width;
+  enemy.drawH = height;
+}
+function loadWave() {
+  const rows = stages[level].rows;
+  crowd = rows.flatMap((row,r)=>[...row].flatMap((token,c)=>{
+    if(token === ".") return [];
+    const kind = bonusCarriers[token] ?? token;
+    const feet = 242+r*44;
+    const enemy = {kind, lane:c-2, feet, startFeet:feet, hp:clubbers[kind].hp ?? 1,
+      bonus:bonusCarriers[token] ? token : null, phase:r*1.3+c*1.8, hurt:0};
+    placeClubber(enemy);
+    return [enemy];
   }));
 }
 function ready() {
@@ -86,13 +123,13 @@ function startGame() {
   level = 0;
   score = 0;
   lives = 3;
-  startWall();
+  startWave();
   failedTracks = 0;
   loadTrack(0);
 }
-function startWall() {
-  pressure = 0; bat = W/2; wide = 0; rewind = false; drops = []; sparks = [];
-  loadWall();
+function startWave() {
+  pressure = 0; bat = W/2; wide = 0; rewind = false; drops = []; impacts = []; walkTime = 0; djHit = 0;
+  loadWave();
   hud();
   ready();
 }
@@ -101,6 +138,7 @@ function serve() {
   const ball = balls[0];
   ball.x = bat;
   ball.attached = false;
+  djHit = .18;
   launch(ball,bat < W/2 ? .31 : -.31);
   setActive("playing");
   announce(stages[level].name.toUpperCase());
@@ -116,6 +154,7 @@ function hitBat(ball) {
   let angle = offset * 1.04;
   if(Math.abs(angle)<.13) angle = (angle || ball.vx || 1) < 0 ? -.13 : .13;
   launch(ball,angle);
+  djHit = .18;
   ball.y = PADDLE_Y-R-.1;
   if(pressure === 6) {
     ball.pierce = 4;
@@ -126,26 +165,35 @@ function hitBat(ball) {
     hud();
   } else soundHit(150,.065,"sine");
 }
-function wallCleared() {
+function waveCleared() {
   addScore(250);
   if(level === stages.length-1) {
-    show("won","ALL THREE WALLS CLEARED","SYSTEM CLEAR.",`Final score ${score.toLocaleString("en-GB")}.`,"Play again");
+    show("won","ALL THREE WAVES CLEARED","SYSTEM CLEAR.",`Final score ${score.toLocaleString("en-GB")}.`,"Play again");
     syncMusic();
     return;
   }
-  show("clear","WALL CLEARED",stages[level].name.toUpperCase()+".",`Next up · ${stages[level+1].name}`,"Next wall");
+  show("clear","WAVE CLEARED",stages[level].name.toUpperCase()+".",`Next up · ${stages[level+1].name}`,"Next wave");
 }
-function loseBall() {
-  if(rewind) {
+function loseBall(breach = false) {
+  if(breach) {
+    for(const enemy of crowd) {
+      enemy.feet = enemy.startFeet;
+      placeClubber(enemy);
+    }
+    flash = .42;
+    soundHit(80,.19,"sawtooth");
+  }
+  if(rewind && !breach) {
     rewind = false;
     ready();
-    announce("REWIND · BALL SAVED",3);
+    announce("REWIND · VINYL SAVED",3);
     soundHit(98,.22,"triangle");
     return;
   }
   lives--;
   pressure = 0;
   wide = 0;
+  rewind = false;
   drops = [];
   hud();
   if(lives === 0) {
@@ -154,7 +202,7 @@ function loseBall() {
     return;
   }
   ready();
-  announce(`${lives} ${lives === 1 ? "LIFE" : "LIVES"} LEFT · TAP TO LAUNCH`,8);
+  announce(`${breach ? "CROWD REACHED THE DECK · " : ""}${lives} ${lives === 1 ? "LIFE" : "LIVES"} LEFT · TAP TO LAUNCH`,8);
 }
 function collect(type) {
   if(type === "s") wide = 14;
@@ -164,43 +212,55 @@ function collect(type) {
     launch(extra, bat < W/2 ? .66 : -.66);
     balls.push(extra);
   }
-  announce(type === "r" ? "REWIND · SAVE ARMED" : type === "s" ? "STACK · WIDER SPEAKER" : "DUBPLATE · EXTRA BALL");
+  announce(type === "r" ? "REWIND · SAVE ARMED" : type === "s" ? "STACK · WIDER DECK" : "DUBPLATE · EXTRA VINYL");
   soundHit(350,.14,"triangle");
   addScore(50);
 }
-function hitBrick(ball,b,oldX,oldY) {
-  const breaking = ball.pierce > 0 || b.hp === 1;
-  if(ball.pierce > 0) ball.pierce--;
+function hitClubber(ball, enemy, oldX, oldY) {
+  const charged = ball.pierce > 0;
+  const breaking = charged || enemy.hp === 1;
+  if(charged) ball.pierce--;
   else {
-    if(oldY+R <= b.y || oldY-R >= b.y+b.h) ball.vy *= -1;
-    else if(oldX+R <= b.x || oldX-R >= b.x+b.w) ball.vx *= -1;
-    else ball.vy *= -1;
-    ball.x = oldX;
-    ball.y = oldY;
+    if(oldY+R <= enemy.y) {ball.vy = -Math.abs(ball.vy);ball.y = enemy.y-R-.25;}
+    else if(oldY-R >= enemy.y+enemy.h) {ball.vy = Math.abs(ball.vy);ball.y = enemy.y+enemy.h+R+.25;}
+    else if(oldX+R <= enemy.x) {ball.vx = -Math.abs(ball.vx);ball.x = enemy.x-R-.25;}
+    else if(oldX-R >= enemy.x+enemy.w) {ball.vx = Math.abs(ball.vx);ball.x = enemy.x+enemy.w+R+.25;}
+    else {
+      ball.vy *= -1;
+      ball.y = ball.vy < 0 ? enemy.y-R-.25 : enemy.y+enemy.h+R+.25;
+    }
   }
+  if(!motion) impacts.push({x:ball.x,y:ball.y,life:.24});
   if(breaking) {
-    bricks.splice(bricks.indexOf(b),1);
-    if(powerups[b.type]) drops.push({x:b.x+b.w/2,y:b.y+b.h/2,type:b.type});
-    burst(b.x+b.w/2,b.y+b.h/2,b.type==="o"?BLUE:AMBER);
+    crowd.splice(crowd.indexOf(enemy),1);
+    if(enemy.bonus) drops.push({x:enemy.center,y:enemy.y+enemy.h/2,type:enemy.bonus});
     pressure = Math.min(6,pressure+1);
-    addScore(b.type==="o" ? 180 : 100);
+    addScore(enemy.kind === "P" ? 180 : 100);
     if(pressure === 6 && !get("notice").textContent) announce("PRESSURE READY");
   } else {
-    b.hp--;
-    burst(ball.x,ball.y,BLUE,5);
+    enemy.hp--;
+    enemy.hurt = .18;
     addScore(25);
   }
-  soundHit(breaking?99+(b.seed%5)*20:75,.072,breaking?"triangle":"sine");
+  soundHit(breaking?136:75,.072,breaking?"triangle":"sine");
 }
 function update(dt) {
   time += dt;
   if(time >= noticeUntil && get("notice").textContent) announce("",0);
-  flash = Math.max(0,flash-dt*2.4);
   if(mode !== "ready" && mode !== "playing") return;
+  flash = Math.max(0,flash-dt*2.4);
+  djHit = Math.max(0,djHit-dt);
   const direction = Number(keys.has("ArrowRight")||keys.has("KeyD"))-Number(keys.has("ArrowLeft")||keys.has("KeyA"));
   if(direction) bat = clamp(bat+direction*530*dt,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
   if(mode === "ready") {balls[0].x = bat;return;}
   wide = Math.max(0,wide-dt);
+  bat = clamp(bat,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
+  walkTime += dt;
+  for(const enemy of crowd) {
+    enemy.feet += dt*stages[level].advance;
+    enemy.hurt = Math.max(0,enemy.hurt-dt);
+    placeClubber(enemy);
+  }
   for(const ball of balls) {
     const oldX = ball.x, oldY = ball.y;
     ball.x += ball.vx*dt;
@@ -211,13 +271,14 @@ function update(dt) {
     }
     if(ball.y-R<TOP) {ball.y=TOP+R;ball.vy=Math.abs(ball.vy);}
     if(ball.vy>0 && oldY+R<=PADDLE_Y && ball.y+R>=PADDLE_Y && Math.abs(ball.x-bat)<paddleWidth()/2+R*.7) hitBat(ball);
-    const brick = bricks.find(b=>{
+    const enemy = crowd.find(b=>{
       const dx = ball.x-clamp(ball.x,b.x,b.x+b.w), dy = ball.y-clamp(ball.y,b.y,b.y+b.h);
       return dx*dx+dy*dy<=R*R;
     });
-    if(brick) hitBrick(ball,brick,oldX,oldY);
-    if(!bricks.length) {wallCleared();return;}
+    if(enemy) hitClubber(ball,enemy,oldX,oldY);
+    if(!crowd.length) {waveCleared();return;}
   }
+  if(crowd.some(enemy=>enemy.feet >= BREACH_Y)) {loseBall(true);return;}
   balls = balls.filter(ball=>ball.y < H+R);
   if(!balls.length) {loseBall();return;}
   for(const drop of drops) {
@@ -229,128 +290,88 @@ function update(dt) {
     }
   }
   drops = drops.filter(drop=>drop.y<H+15);
-  for(const s of sparks) {s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=290*dt;s.life-=dt;}
-  sparks = sparks.filter(s=>s.life>0);
-}
-function burst(x,y,color,count=16) {
-  if(motion) return;
-  for(let i=0;i<count;i++) sparks.push({x,y,color,vx:(Math.random()-.5)*245,vy:(Math.random()-.68)*220,life:.2+Math.random()*.45,size:2+Math.random()*4});
+  impacts = impacts.filter(impact=>(impact.life-=dt)>0);
 }
 
-function arch() {
+function imageReady(image) {return image.complete && image.naturalWidth>0;}
+function sprite(name,x,y,w,h) {
+  const image = art[name];
+  if(!imageReady(image)) return false;
+  ctx.drawImage(image,x,y,w,h);
+  return true;
+}
+function background() {
+  rect(0,0,W,H,"#141a27");
+  const image = art.alley;
+  if(!imageReady(image)) return;
+  const aspect = field.width/field.height;
+  const sw = Math.min(image.naturalWidth,image.naturalHeight*aspect);
+  const sh = Math.min(image.naturalHeight,image.naturalWidth/aspect);
+  ctx.drawImage(image,(image.naturalWidth-sw)/2,(image.naturalHeight-sh)*.4,sw,sh,0,0,W,H);
+  rect(0,0,W,H,"#0c10142a");
+}
+function drawClubber(enemy) {
+  const info = clubbers[enemy.kind];
+  const step = walkTime*7.1+enemy.phase;
+  const active = mode === "playing" && !motion;
+  const sway = active ? Math.sin(step)*2 : 0;
+  const lift = active ? Math.abs(Math.sin(step))*2.6 : 0;
+  const foot = enemy.feet-lift;
+  ctx.fillStyle="#080a0cb0";
   ctx.beginPath();
-  ctx.moveTo(49,H);
-  ctx.lineTo(49,196);
-  ctx.bezierCurveTo(49,69,151,13,320,13);
-  ctx.bezierCurveTo(489,13,591,69,591,196);
-  ctx.lineTo(591,H);
+  ctx.ellipse(enemy.center,enemy.feet-2,enemy.drawW*.38,6,0,0,Math.PI*2);
+  ctx.fill();
+  if(enemy.hurt > 0) {
+    ctx.shadowColor = info.color;
+    ctx.shadowBlur = 14;
+  }
+  if(!sprite(info.sprite,enemy.center-enemy.drawW/2+sway,foot-enemy.drawH,enemy.drawW,enemy.drawH)) {
+    rect(enemy.x,enemy.y,enemy.w,enemy.h,info.color);
+  }
+  ctx.shadowBlur = 0;
+  if(enemy.hp>1) rect(enemy.center-7,foot+3,14,2,info.color);
 }
-function makeBackdrop() {
-  const image = document.createElement("canvas");
-  image.width = W; image.height = H;
-  const g = image.getContext("2d");
-  let rng = 987192;
-  const random = () => {rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/4294967296;};
-  g.fillStyle = "#201714";
-  g.fillRect(0,0,W,H);
-  for(let row=0;row<27;row++) for(let col=-1;col<14;col++){
-    const x=col*56+(row%2)*28, y=row*22, tone=Math.round(36+random()*26);
-    g.fillStyle=`rgb(${tone+19},${tone-5},${tone-12})`;
-    g.fillRect(x,y,54,20);
-    g.fillStyle="#301b16";
-    g.fillRect(x,y+18,54,2);
+function drawDJ() {
+  const width = paddleWidth(), height = width*.87*spriteAspect;
+  const bottom = PADDLE_Y + height*.22;
+  if(!sprite(djHit>0?"dj-hit":"dj-idle",bat-width/2,bottom-height,width,height)) {
+    rect(bat-width/2,PADDLE_Y,width,13,"#555548");
   }
-  const shade = g.createLinearGradient(0,35,0,H);
-  shade.addColorStop(0,"#181310");
-  shade.addColorStop(.57,"#211513");
-  shade.addColorStop(1,"#100f0e");
-  g.beginPath();
-  g.moveTo(49,H);g.lineTo(49,196);
-  g.bezierCurveTo(49,69,151,13,320,13);
-  g.bezierCurveTo(489,13,591,69,591,196);
-  g.lineTo(591,H);g.closePath();
-  g.fillStyle=shade;g.fill();
-  g.strokeStyle="#997463";g.lineWidth=2;g.stroke();
-  const glow = g.createRadialGradient(W/2,275,30,W/2,275,380);
-  glow.addColorStop(0,"#a549251c");
-  glow.addColorStop(.55,"#9e4f2510");
-  glow.addColorStop(1,"#050404aa");
-  g.fillStyle=glow;
-  g.fillRect(0,0,W,H);
-  for(let i=0;i<14000;i++) {
-    g.fillStyle=random()>.5?"#ffbb8a0b":"#0101012e";
-    g.fillRect(random()*W,random()*H,1+random()*4,1);
-  }
-  return image;
-}
-function drawBrick(b) {
-  const metal = b.type === "o";
-  const tones = ["#9d523f","#b3634b","#884839","#aa5743","#a45b45"];
-  const color = metal ? (b.hp===2?"#546263":"#645451") : tones[b.seed%tones.length];
-  rect(b.x+2,b.y+4,b.w,b.h,"#07060591");
-  rect(b.x,b.y,b.w,b.h,color);
-  rect(b.x,b.y,b.w,2,metal?"#94a7a6":"#df946a");
-  rect(b.x,b.y+b.h-3,b.w,3,metal?"#303738":"#562e27");
-  rect(b.x,b.y,2,b.h,"#ffb1923b");
-  for(let i=0;i<13;i++) {
-    const x=(i*19+b.seed*11)%61, y=(i*7+b.seed*2)%22;
-    rect(b.x+x+2,b.y+y+4,2+(i%5),1,i%2?"#0003":"#f5bb8d29");
-  }
-  if(metal) {
-    for(const x of [5,b.w-8]) for(const y of [5,b.h-8]) rect(b.x+x,b.y+y,3,3,"#bbcecd");
-    if(b.hp===1) {
-      ctx.strokeStyle="#2d2421";ctx.lineWidth=2;ctx.beginPath();
-      ctx.moveTo(b.x+28,b.y);ctx.lineTo(b.x+34,b.y+12);ctx.lineTo(b.x+29,b.y+17);ctx.lineTo(b.x+40,b.y+b.h);ctx.stroke();
-    }
-  }
-  if(powerups[b.type]) {
-    rect(b.x+b.w/2-9,b.y+10,18,10,"#271916");
-    rect(b.x+b.w/2-5,b.y+13,10,4,powerups[b.type].color);
-  }
-}
-function speaker() {
-  const w=paddleWidth(), x=bat-w/2;
-  rect(x-2,PADDLE_Y+5,w+4,21,"#080707aa");
-  rect(x,PADDLE_Y,w,22,"#262521");
-  rect(x,PADDLE_Y,w,3,pressure===6?LIME:"#d48b60");
-  rect(x,PADDLE_Y+19,w,3,"#090808");
-  const count = wide>0?4:3;
-  for(let i=0;i<count;i++){
-    const sx=x+5+(w-10)*i/count, sw=(w-10)/count;
-    rect(sx+2,PADDLE_Y+5,sw-4,12,"#111210");
-    for(let j=0;j<4;j++) rect(sx+6,PADDLE_Y+6+j*3,sw-12,1,"#64635a");
-  }
-  if(rewind){rect(x+2,PADDLE_Y+4,4,14,AMBER);rect(x+w-6,PADDLE_Y+4,4,14,AMBER);}
+  rect(bat-width/2+3,PADDLE_Y-1,width-6,2,pressure===6?LIME:rewind?AMBER:"#86deed");
 }
 function draw() {
   ctx.setTransform(field.width/W,0,0,field.height/H,0,0);
-  ctx.drawImage(backdrop,0,0);
-  if(flash>0 && !motion){
-    ctx.save();ctx.globalAlpha=flash*.58;ctx.strokeStyle=LIME;ctx.lineWidth=3;arch();ctx.stroke();ctx.restore();
-  }
-  rect(LEFT,PADDLE_Y+34,RIGHT-LEFT,1,"#d37b4a61");
-  bricks.forEach(drawBrick);
-  for(const p of sparks){
-    ctx.globalAlpha=Math.min(1,p.life*3);
-    rect(p.x,p.y,p.size,p.size,p.color);
+  background();
+  rect(LEFT,BREACH_Y,RIGHT-LEFT,1,flash>0?"#dcb872aa":"#dcb87238");
+  for(const enemy of crowd) drawClubber(enemy);
+  for(const impact of impacts) {
+    const size = 34 + (.24-impact.life)*150;
+    ctx.globalAlpha = Math.min(1,impact.life*7);
+    sprite("fx-impact",impact.x-size/2,impact.y-size*spriteAspect/2,size,size*spriteAspect);
   }
   ctx.globalAlpha=1;
   for(const drop of drops) {
-    const p=powerups[drop.type];
-    rect(drop.x-35,drop.y-11,70,22,"#171715");
-    rect(drop.x-35,drop.y-11,70,2,p.color);
-    ctx.fillStyle=p.color;ctx.textAlign="center";ctx.font="bold 12px monospace";ctx.fillText(p.name,drop.x,drop.y+5);
+    const item = powerups[drop.type];
+    const w = 42, h = 31*spriteAspect;
+    if(!sprite(item.sprite,drop.x-w/2,drop.y-h/2,w,h)) rect(drop.x-11,drop.y-7,22,14,item.color);
   }
-  speaker();
-  for(const ball of balls){
-    ctx.save();ctx.fillStyle=ball.pierce?LIME:"#fff5d8";ctx.shadowColor=ball.pierce?LIME:AMBER;ctx.shadowBlur=ball.pierce?23:12;
-    ctx.beginPath();ctx.arc(ball.x,ball.y,R,0,Math.PI*2);ctx.fill();ctx.restore();
+  drawDJ();
+  for(const ball of balls) {
+    const size = R*2+4, height = size*spriteAspect;
+    const name = ball.pierce ? "vinyl-charged" : "vinyl";
+    if(sprite(name,ball.x-size/2,ball.y-height/2,size,height)) continue;
+    ctx.beginPath();
+    ctx.fillStyle = ball.pierce?LIME:"#fff5d8";
+    ctx.arc(ball.x,ball.y,R,0,Math.PI*2);
+    ctx.fill();
   }
 }
 function resize() {
   const box=field.getBoundingClientRect(), dpr=Math.min(2,devicePixelRatio || 1);
   field.width=Math.max(1,Math.round(box.width*dpr));
   field.height=Math.max(1,Math.round(box.height*dpr));
+  spriteAspect = clamp((field.width/W)/(field.height/H),.5,1.18);
+  crowd.forEach(placeClubber);
 }
 function initAudio() {
   if(!sound) return;
@@ -420,7 +441,7 @@ function togglePause() {
 function action() {
   initAudio();
   if(mode==="paused") togglePause();
-  else if(mode==="clear") {level++;startWall();}
+  else if(mode==="clear") {level++;startWave();}
   else if(["menu","lost","won"].includes(mode)) startGame();
 }
 function movePointer(event) {
@@ -468,8 +489,7 @@ document.addEventListener("visibilitychange",()=>{
   else syncMusic();
 });
 new ResizeObserver(resize).observe(field);
-backdrop=makeBackdrop();
-loadWall();
+loadWave();
 hud();
 resize();
 let last=performance.now(), lag=0;
