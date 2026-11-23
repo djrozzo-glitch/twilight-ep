@@ -45,3 +45,19 @@ small{margin-top:14px;color:#c0b9a9;font-size:.7rem}
 .touch-separator{color:var(--orange);margin:0 .24em}
 .touch-grip{width:16px;height:12px;flex:none;background:repeating-linear-gradient(90deg,#8b836e 0 2px,transparent 2px 5px)}
 @media(max-height:640px) and (orientation:landscape){body{padding:6px}.cabinet{padding:7px}.mast{gap:5px;padding:0 0 5px}.release{padding-top:5px}.stage{height:max(195px,calc(100dvh - 180px))}.touch-strip{min-height:44px}.panel h1{font-size:52px}.kicker{margin-bottom:10px}}
+
+/* Twilight release finale: compact for narrow portrait screens. */
+.end-release{margin:2px 0 16px;padding:11px 19px;border-block:1px solid #6f6248;background:#101618aa;text-align:center;width:min(100%,340px)}
+.end-release[hidden],.share-action[hidden],.release-action[hidden]{display:none!important}
+.end-release-eyebrow{font-size:.63rem;letter-spacing:.24em;color:#c9c0ad;margin-bottom:8px}
+.end-release-title{font-family:"Archivo Black","Arial Black",sans-serif;font-weight:900;letter-spacing:-.04em;font-size:clamp(18px,5vw,26px);color:#e2fc75;line-height:1.15}
+.end-release-title span{color:#f3f0e7}
+.end-release-label{color:#ff925c;font-size:.7rem;letter-spacing:.22em;margin-top:7px}
+.end-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center;justify-content:center;max-width:100%}
+.end-actions .action{min-height:47px;padding:0 17px}
+.share-action,.release-action{display:inline-flex;align-items:center;justify-content:center;min-height:47px;font:700 .75rem/1.2 ui-monospace,monospace;letter-spacing:.045em;padding:10px 14px;border:1px solid #c2b99d;color:#f6f1df;background:#292824;text-decoration:none;cursor:pointer}
+.release-action{border-color:#ff925c;color:#ffb28b}
+.share-action:hover,.release-action:hover{border-color:#e2fc75;color:#e2fc75}
+.panel.finale h1{font-size:clamp(29px,7.5vw,66px);line-height:.99;letter-spacing:-.055em;margin-bottom:12px;max-width:530px}
+.panel.finale p{margin:4px 0 12px;max-width:440px}
+@media(max-width:420px){.end-actions{gap:7px}.end-actions .action,.share-action,.release-action{min-height:43px;font-size:.67rem;padding:7px 10px}.end-release{margin-bottom:10px;padding:9px}.panel.finale h1{font-size:clamp(27px,7vw,39px)}}
