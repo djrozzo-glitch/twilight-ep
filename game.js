@@ -8,7 +8,6 @@ const DJ_BOTTOM = H - 4, DJ_DECK_ROW = 425/512, DJ_BOTTOM_ROW = 496/512;
 // The entrance is the ground under the arch in london-alley.webp.
 const ALLEY_W = 1122, ALLEY_H = 1402, ARCH_X = .505, ARCH_Y = .446;
 const FRONT_ROW_Y = 356, ENTRY_DEPTH = 20;
-const BALL_CEILING_OFFSET = 56;
 const LIME = "#e2fc75", AMBER = "#ff9c61", BLUE = "#9fe1f1";
 const stages = [
   {name:"The Arch", speed:326, advance:1.25, rows:["NI.LV","ILNP.","IVHVI",".NILH","d.V.s"], incoming:[".LHP.","I.r.N"]},
@@ -139,8 +138,8 @@ function setActive(kind) {
 function placeClubber(enemy) {
   const distance = Math.max(0,enemy.feet-archY);
   const depth = clamp(distance/(BREACH_Y-archY),0,1);
-  const spread = 15 + depth*121;
-  const width = 17 + depth*53;
+  const spread = 18 + depth*128;
+  const width = 23 + depth*68;
   enemy.visibility = clamp(distance/ENTRY_DEPTH,0,1);
   const info = clubbers[enemy.kind];
   const heightRatio = info.hp===2 ? 1.91 : 2.34;
@@ -456,8 +455,7 @@ function update(dt) {
       ball.x = clamp(ball.x,LEFT+R,RIGHT-R);
       ball.vx *= -1;
     }
-    const ceiling = Math.max(TOP,archY-BALL_CEILING_OFFSET);
-    if(ball.y-R<ceiling) {ball.y=ceiling+R;ball.vy=Math.abs(ball.vy);}
+    if(ball.y-R<TOP) {ball.y=TOP+R;ball.vy=Math.abs(ball.vy);}
     const contact = djContact(ball,oldY,dj);
     if(contact !== undefined) {
       hitBat(ball,contact);
