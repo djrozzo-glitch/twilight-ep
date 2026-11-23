@@ -377,6 +377,9 @@ function loseBall(breach = false) {
   drops = [];
   hud();
   if(lives === 0) {
+    crowd = [];
+    drops = [];
+    impacts = [];
     show("lost","END OF SET","THE MAINSTREAM WON.",`Level ${level+1}/10 · Score ${score.toLocaleString("en-GB")} · Best ${best.toLocaleString("en-GB")}`,"TRY AGAIN");
     syncMusic();
     return;
