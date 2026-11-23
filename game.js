@@ -123,6 +123,11 @@ function show(kind, kicker, title, message, action, hint = "") {
   get("kicker").textContent = kicker;
   get("title").textContent = title;
   get("title").classList.add("compact");
+  const finale = kind === "won" || kind === "lost";
+  get("overlay").querySelector(".panel").classList.toggle("finale", finale);
+  get("end-release").hidden = !finale;
+  get("share-score").hidden = !finale;
+  get("listen-ep").hidden = !finale;
   get("message").textContent = message;
   get("action").textContent = action;
   get("hint").textContent = hint;
@@ -132,6 +137,7 @@ function show(kind, kicker, title, message, action, hint = "") {
 function setActive(kind) {
   mode = kind;
   get("overlay").hidden = true;
+  get("overlay").querySelector(".panel").classList.remove("finale");
   touchStrip.disabled = false;
   get("pause").disabled = false;
   get("pause").textContent = "Pause";
@@ -341,7 +347,7 @@ function hitBat(ball, contact) {
 function waveCleared() {
   addScore(250);
   if(level === stages.length-1) {
-    show("won","ALL TEN LEVELS CLEARED","SYSTEM CLEAR.",`Final score ${score.toLocaleString("en-GB")}.`,"Play again");
+    show("won","ALL TEN LEVELS CLEARED","YOU SAVED THE UNDERGROUND.",`Level 10/10 · Score ${score.toLocaleString("en-GB")}`,"PLAY AGAIN");
     syncMusic();
     return;
   }
@@ -371,7 +377,7 @@ function loseBall(breach = false) {
   drops = [];
   hud();
   if(lives === 0) {
-    show("lost","END OF SET","SIGNAL LOST.",`Score ${score.toLocaleString("en-GB")} · Best ${best.toLocaleString("en-GB")}`,"Play again");
+    show("lost","END OF SET","THE MAINSTREAM WON.",`Level ${level+1}/10 · Score ${score.toLocaleString("en-GB")} · Best ${best.toLocaleString("en-GB")}`,"TRY AGAIN");
     syncMusic();
     return;
   }
@@ -814,6 +820,30 @@ for(const surface of [field,touchStrip]) {
 touchStrip.addEventListener("click",event=>{
   if(event.detail === 0) {serveFromInput(); lockDesktopPointer();}
 });
+// Share the actual score as text. Do not pretend it is a verified public leaderboard.
+async function shareScore() {
+  const url = "https://weirdflex.online/twilight/";
+  const heading = mode === "won" ? "I saved the underground in TWILIGHT." : "The underground needs backup in TWILIGHT.";
+  const message = heading + "\nLevel " + (level+1) + "/10 · Score " + score.toLocaleString("en-GB") + "\nCan you beat me?";
+  const button = get("share-score");
+  if(navigator.share) {
+    try {
+      await navigator.share({title:"TWILIGHT — lowQ · Shifted",text:message,url});
+      return;
+    } catch(error) {
+      if(error && error.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(message + "\n" + url);
+    button.textContent = "COPIED!";
+    setTimeout(()=>{button.textContent="SHARE SCORE";},1700);
+  } catch {
+    // Clipboard can be blocked by cross-origin embeds: allow manual copy as fallback.
+    window.prompt("Copy your TWILIGHT score:",message+"\n"+url);
+  }
+}
+get("share-score").addEventListener("click",shareScore);
 get("action").addEventListener("click",action);
 get("pause").addEventListener("click",togglePause);
 get("sound").addEventListener("click",()=>{
