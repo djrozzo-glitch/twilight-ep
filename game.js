@@ -7,19 +7,20 @@ const W = 640, H = 570, LEFT = 23, RIGHT = W - LEFT, TOP = 20, BREACH_Y = 474, R
 const DJ_BOTTOM = H - 4, DJ_DECK_ROW = 425/512, DJ_BOTTOM_ROW = 496/512;
 // The entrance is the ground under the arch in london-alley.webp.
 const ALLEY_W = 1122, ALLEY_H = 1402, ARCH_X = .505, ARCH_Y = .446;
-const FRONT_ROW_Y = 402, ENTRY_DEPTH = 20;
+const FRONT_ROW_Y = 356, ENTRY_DEPTH = 20;
+const BALL_CEILING_OFFSET = 56;
 const LIME = "#e2fc75", AMBER = "#ff9c61", BLUE = "#9fe1f1";
 const stages = [
-  {name:"The Arch", speed:326, advance:2.5, rows:["NI.LV","ILNP.","IVHVI",".NILH","d.V.s"], incoming:[".LHP.","I.r.N"]},
-  {name:"Side Street", speed:338, advance:2.8, rows:["I.OPL","PINH.","VOLVN",".IVPH","Vs.Od"], incoming:["I.bOL",".V.rP"]},
-  {name:"Soundcheck", speed:350, advance:3.1, rows:["VP.OH","NOLPI","IPH.L","PLONP",".dP.s"], incoming:["N.mLV",".rPl."]},
-  {name:"Back Door", speed:362, advance:3.4, rows:["LIP.O","AILVP","HVPOL","VP.NA","ds.PV"], incoming:[".mH.P","V.lPI","I.bOr"]},
-  {name:"Last Entry", speed:374, advance:3.7, rows:["PL.OA","HLPNP","LPVHL","PILPV","IVsPd"], incoming:[".lPLO","Vw.Hr",".VcLP"]},
-  {name:"The Queue", speed:388, advance:4.0, rows:["IPLA.","CPLON","PLOPV","HLVPC","dPsIV"], incoming:["b.CwP","Lm.AP","Irl.C"]},
-  {name:"Lock-In", speed:403, advance:4.3, rows:["CLVAI","VPIPL","OLPHC","PAIVL","IdPsV"], incoming:[".uPbI","Vm.HP","lVrCw"]},
-  {name:"No Guest List", speed:418, advance:4.7, rows:["CLPPI","LIOVA","VPIPL","HPALM","PsdVL"], incoming:["wMP.V","Pm.bO","lVPIr","IcHuP"]},
-  {name:"Peak Time", speed:435, advance:5.1, rows:["PVMLP","LPIOV","VPCLA","IPVPM","sPdPV"], incoming:["PmHbV","u.PwL","IVlAr","P.cMP"]},
-  {name:"System Pressure", speed:455, advance:5.5, rows:["APMCL","LPPVO","PVAPP","IPPML","LsdPP"], incoming:["mVPwI","OlPbV","PrMuP","PL.cC"]},
+  {name:"The Arch", speed:326, advance:1.25, rows:["NI.LV","ILNP.","IVHVI",".NILH","d.V.s"], incoming:[".LHP.","I.r.N"]},
+  {name:"Side Street", speed:338, advance:1.38, rows:["I.OPL","PINH.","VOLVN",".IVPH","Vs.Od"], incoming:["I.bOL",".V.rP"]},
+  {name:"Soundcheck", speed:350, advance:1.52, rows:["VP.OH","NOLPI","IPH.L","PLONP",".dP.s"], incoming:["N.mLV",".rPl."]},
+  {name:"Back Door", speed:362, advance:1.68, rows:["LIP.O","AILVP","HVPOL","VP.NA","ds.PV"], incoming:[".mH.P","V.lPI","I.bOr"]},
+  {name:"Last Entry", speed:374, advance:1.85, rows:["PL.OA","HLPNP","LPVHL","PILPV","IVsPd"], incoming:[".lPLO","Vw.Hr",".VcLP"]},
+  {name:"The Queue", speed:388, advance:2.05, rows:["IPLA.","CPLON","PLOPV","HLVPC","dPsIV"], incoming:["b.CwP","Lm.AP","Irl.C"]},
+  {name:"Lock-In", speed:403, advance:2.24, rows:["CLVAI","VPIPL","OLPHC","PAIVL","IdPsV"], incoming:[".uPbI","Vm.HP","lVrCw"]},
+  {name:"No Guest List", speed:418, advance:2.42, rows:["CLPPI","LIOVA","VPIPL","HPALM","PsdVL"], incoming:["wMP.V","Pm.bO","lVPIr","IcHuP"]},
+  {name:"Peak Time", speed:435, advance:2.63, rows:["PVMLP","LPIOV","VPCLA","IPVPM","sPdPV"], incoming:["PmHbV","u.PwL","IVlAr","P.cMP"]},
+  {name:"System Pressure", speed:455, advance:2.82, rows:["APMCL","LPPVO","PVAPP","IPPML","LsdPP"], incoming:["mVPwI","OlPbV","PrMuP","PL.cC"]},
 ];
 const clubbers = {
   V:{sprite:"clubber-vip", color:BLUE},
@@ -114,6 +115,7 @@ function announce(text, seconds = 1.25) {
   noticeUntil = time + seconds;
 }
 function show(kind, kicker, title, message, action, hint = "") {
+  if(document.pointerLockElement === field) document.exitPointerLock();
   mode = kind;
   announce("",0);
   get("overlay").hidden = false;
@@ -454,7 +456,8 @@ function update(dt) {
       ball.x = clamp(ball.x,LEFT+R,RIGHT-R);
       ball.vx *= -1;
     }
-    if(ball.y-R<TOP) {ball.y=TOP+R;ball.vy=Math.abs(ball.vy);}
+    const ceiling = Math.max(TOP,archY-BALL_CEILING_OFFSET);
+    if(ball.y-R<ceiling) {ball.y=ceiling+R;ball.vy=Math.abs(ball.vy);}
     const contact = djContact(ball,oldY,dj);
     if(contact !== undefined) {
       hitBat(ball,contact);
@@ -663,11 +666,34 @@ function togglePause() {
 }
 function action() {
   initAudio();
-  if(mode==="paused") togglePause();
+  if(mode==="paused") {togglePause(); if(priorMode === "playing") lockDesktopPointer();}
   else if(mode==="clear") {level++;startWave();}
   else if(["menu","lost","won"].includes(mode)) startGame();
 }
+// Pointer lock keeps the desktop cursor inside the game, including on trackpads.
+let usedPointerLock = false;
+function lockDesktopPointer() {
+  if(!field.requestPointerLock || document.pointerLockElement === field) return;
+  try {
+    const pending = field.requestPointerLock();
+    if(pending && pending.catch) pending.catch(()=>{});
+  } catch {}
+}
+document.addEventListener("pointerlockchange",()=>{
+  const locked = document.pointerLockElement === field;
+  field.classList.toggle("pointer-locked",locked);
+  touchStrip.classList.toggle("pointer-locked",locked);
+  if(locked) usedPointerLock = true;
+  else if(usedPointerLock && mode === "playing") togglePause();
+});
+document.addEventListener("mousemove",event=>{
+  if(document.pointerLockElement !== field || !["playing","ready"].includes(mode)) return;
+  const scale = W / Math.max(1,field.getBoundingClientRect().width);
+  const direction = hazard === "l" ? -1 : 1;
+  bat = clamp(bat + event.movementX*scale*direction,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
+});
 function movePointer(event) {
+  if(document.pointerLockElement === field) return;
   const box = event.currentTarget.getBoundingClientRect();
   const position = (event.clientX-box.left)*W/box.width;
   bat = clamp(hazard === "l" ? W-position : position,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
@@ -680,6 +706,12 @@ function serveFromInput() {
 for(const surface of [field,touchStrip]) {
   surface.addEventListener("pointerdown",event=>{
     if(event.button !== 0 || pointer !== undefined || !["ready","playing"].includes(mode)) return;
+    if(event.pointerType === "mouse") {
+      movePointer(event);
+      serveFromInput();
+      lockDesktopPointer();
+      return;
+    }
     pointer = event.pointerId;
     surface.setPointerCapture(pointer);
     movePointer(event);
@@ -687,7 +719,7 @@ for(const surface of [field,touchStrip]) {
   });
   surface.addEventListener("pointermove",event=>{
     if(!["ready","playing"].includes(mode)) return;
-    if(event.pointerId === pointer || (pointer === undefined && surface === field && event.pointerType === "mouse")) {
+    if(document.pointerLockElement !== field && (event.pointerId === pointer || (pointer === undefined && surface === field && event.pointerType === "mouse"))) {
       movePointer(event);
     }
   });
@@ -696,7 +728,7 @@ for(const surface of [field,touchStrip]) {
   });
 }
 touchStrip.addEventListener("click",event=>{
-  if(event.detail === 0) serveFromInput();
+  if(event.detail === 0) {serveFromInput(); lockDesktopPointer();}
 });
 get("action").addEventListener("click",action);
 get("pause").addEventListener("click",togglePause);
@@ -716,7 +748,7 @@ window.addEventListener("keydown",event=>{
   }
   if(event.repeat) return;
   if(event.code==="KeyP" || event.code==="Escape") {togglePause();return;}
-  if(event.code==="Space" && mode==="ready") {event.preventDefault();serveFromInput();}
+  if(event.code==="Space" && mode==="ready") {event.preventDefault();serveFromInput();lockDesktopPointer();}
 });
 window.addEventListener("keyup",event=>keys.delete(event.code));
 window.addEventListener("blur",()=>keys.clear());
