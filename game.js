@@ -88,6 +88,7 @@ let alleyCrop, archX = W*ARCH_X, archY = H*ARCH_Y;
 const incomingStatus = get("incoming");
 const effectStatus = get("effects");
 let flash = 0, time = 0, noticeUntil = 0, walkTime = 0, throwElapsed = -1, spriteAspect = 1;
+let alleyGlow = 0;
 let audio, master, sound = true;
 let pointer;
 
@@ -212,7 +213,7 @@ function ready() {
   setActive("ready");
   announce("TAP BELOW OR PRESS SPACE TO LAUNCH",60);
 }
-function newBall(x,y) {return {x,y,vx:0,vy:0,pierce:0,attached:false};}
+function newBall(x,y) {return {x,y,vx:0,vy:0,pierce:0,attached:false,trail:[]};}
 function startGame() {
   level = 0;
   score = 0;
@@ -413,7 +414,11 @@ function hitClubber(ball, enemy, oldX, oldY) {
       ball.y = ball.vy < 0 ? enemy.y-R-.25 : enemy.y+enemy.h+R+.25;
     }
   }
-  if(!motion) impacts.push({x:ball.x,y:ball.y,life:.24});
+  if(!motion) impacts.push({x:ball.x,y:ball.y,life:.26,maxLife:.26,strong:breaking,color:clubbers[enemy.kind].color,
+    sparks:Array.from({length:breaking?7:3},(_,i)=>({
+      angle:(i/(breaking?7:3))*Math.PI*2+Math.random()*.45,
+      speed:breaking?55+Math.random()*65:35+Math.random()*35
+    }))});
   if(breaking) {
     crowd.splice(crowd.indexOf(enemy),1);
     if(enemy.bonus) drops.push({x:enemy.center,y:enemy.y+enemy.h/2,type:enemy.bonus});
@@ -432,6 +437,7 @@ function update(dt) {
   if(time >= noticeUntil && get("notice").textContent) announce("",0);
   if(mode !== "ready" && mode !== "playing") return;
   flash = Math.max(0,flash-dt*2.4);
+  if(!motion) alleyGlow += dt;
   const direction = Number(keys.has("ArrowRight")||keys.has("KeyD"))-Number(keys.has("ArrowLeft")||keys.has("KeyA"));
   if(direction) bat = clamp(bat+direction*(hazard==="l"?-1:1)*530*dt,LEFT+paddleWidth()/2,RIGHT-paddleWidth()/2);
   advanceThrow(dt);
@@ -451,6 +457,10 @@ function update(dt) {
     const oldX = ball.x, oldY = ball.y;
     ball.x += ball.vx*dt;
     ball.y += ball.vy*dt;
+    if(!motion) {
+      ball.trail.push({x:ball.x,y:ball.y,life:.15});
+      if(ball.trail.length>9) ball.trail.shift();
+    }
     if(ball.x-R<LEFT || ball.x+R>RIGHT) {
       ball.x = clamp(ball.x,LEFT+R,RIGHT-R);
       ball.vx *= -1;
@@ -483,6 +493,7 @@ function update(dt) {
   }
   drops = drops.filter(drop=>drop.y<H+15);
   impacts = impacts.filter(impact=>(impact.life-=dt)>0);
+  if(!motion) for(const ball of balls) ball.trail = ball.trail.filter(p=>(p.life-=dt)>0);
 }
 
 function imageReady(image) {return image.complete && image.naturalWidth>0;}
@@ -499,6 +510,15 @@ function background() {
   const {x,y,w,h} = alleyCrop;
   ctx.drawImage(image,x,y,w,h,0,0,W,H);
   rect(0,0,W,H,"#0c10142a");
+  if(!motion) {
+    // A dim, slow cyan glow around the far railway arch, not a full-screen flash.
+    const pulse = .045 + .025*Math.sin(alleyGlow*1.9) + .012*Math.sin(alleyGlow*7.1);
+    const glow = ctx.createRadialGradient(archX,archY-24,4,archX,archY-24,120);
+    glow.addColorStop(0,"rgba(72,220,228,"+pulse.toFixed(3)+")");
+    glow.addColorStop(1,"rgba(72,220,228,0)");
+    ctx.fillStyle=glow;
+    ctx.fillRect(archX-120,archY-144,240,240);
+  }
 }
 function drawClubber(enemy) {
   if(enemy.visibility <= 0) return;
@@ -542,9 +562,26 @@ function draw() {
   rect(LEFT,BREACH_Y,RIGHT-LEFT,1,flash>0?"#dcb872aa":"#dcb87238");
   for(const enemy of crowd) drawClubber(enemy);
   for(const impact of impacts) {
-    const size = 34 + (.24-impact.life)*150;
-    ctx.globalAlpha = Math.min(1,impact.life*7);
+    const age = impact.maxLife-impact.life;
+    const fade = impact.life/impact.maxLife;
+    const radius = 9 + age*(impact.strong?115:70);
+    ctx.save();
+    ctx.globalAlpha = fade*.8;
+    ctx.strokeStyle = impact.color;
+    ctx.lineWidth = impact.strong?2.5:1.5;
+    ctx.beginPath();
+    ctx.arc(impact.x,impact.y,radius,0,Math.PI*2);
+    ctx.stroke();
+    for(const spark of impact.sparks) {
+      const distance = age*spark.speed;
+      ctx.beginPath();
+      ctx.moveTo(impact.x+Math.cos(spark.angle)*distance,impact.y+Math.sin(spark.angle)*distance);
+      ctx.lineTo(impact.x+Math.cos(spark.angle)*(distance+5),impact.y+Math.sin(spark.angle)*(distance+5));
+      ctx.stroke();
+    }
+    const size = 26 + age*95;
     sprite("fx-impact",impact.x-size/2,impact.y-size*spriteAspect/2,size,size*spriteAspect);
+    ctx.restore();
   }
   ctx.globalAlpha=1;
   for(const drop of drops) {
@@ -569,6 +606,21 @@ function draw() {
   }
   drawDJ();
   for(const ball of balls) {
+    if(!motion && !ball.attached && ball.trail.length) {
+      const tone=ball.pierce?LIME:"#f4e9cf";
+      ctx.save();
+      for(let i=0;i<ball.trail.length;i++) {
+        const p=ball.trail[i];
+        const fade=p.life/.15;
+        ctx.globalAlpha=fade*.26;
+        ctx.fillStyle=tone;
+        ctx.beginPath();
+        ctx.ellipse(p.x,p.y,Math.max(1,R*(.24+.5*fade)),Math.max(1,R*spriteAspect*(.24+.5*fade)),0,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     if(ball.attached && throwElapsed >= 0) continue;
     const size = R*2+4, height = size*spriteAspect;
     const name = ball.pierce ? "vinyl-charged" : "vinyl";
