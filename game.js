@@ -458,8 +458,8 @@ function update(dt) {
     ball.x += ball.vx*dt;
     ball.y += ball.vy*dt;
     if(!motion) {
-      ball.trail.push({x:ball.x,y:ball.y,life:.15});
-      if(ball.trail.length>9) ball.trail.shift();
+      ball.trail.push({x:ball.x,y:ball.y,life:.32});
+      if(ball.trail.length>48) ball.trail.shift();
     }
     if(ball.x-R<LEFT || ball.x+R>RIGHT) {
       ball.x = clamp(ball.x,LEFT+R,RIGHT-R);
@@ -556,6 +556,54 @@ function drawDJ() {
     rect(bat+width/2-19,deckY()-1,16,2,trim);
   }
 }
+// A three-pass, motion-blurred ribbon instead of disconnected ghost circles.
+function drawBallTrail(ball) {
+  if(motion || ball.attached || ball.trail.length < 3) return;
+  const points = ball.trail;
+  const tail = points[0];
+  const head = points[points.length-1];
+  // If a rebound or resize produced a gap, avoid drawing a line across the scene.
+  if(Math.hypot(head.x-tail.x,head.y-tail.y) < 3) return;
+  const charged = ball.pierce > 0;
+  const rgb = charged ? "226,252,117" : "255,243,220";
+  const gradient = ctx.createLinearGradient(tail.x,tail.y,head.x,head.y);
+  gradient.addColorStop(0,"rgba("+rgb+",0)");
+  gradient.addColorStop(.35,"rgba("+rgb+",.20)");
+  gradient.addColorStop(1,"rgba("+rgb+",.78)");
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // Soft outer haze, luminous middle and a narrow comet core.
+  for(const layer of [
+    {width:charged?28:24,blur:10,opacity:.65},
+    {width:charged?14:11,blur:4,opacity:.70},
+    {width:charged?5:3.5,blur:0,opacity:.66}
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(tail.x,tail.y);
+    for(let i=1;i<points.length-1;i++) {
+      const p=points[i], next=points[i+1];
+      ctx.quadraticCurveTo(p.x,p.y,(p.x+next.x)/2,(p.y+next.y)/2);
+    }
+    ctx.lineTo(head.x,head.y);
+    ctx.strokeStyle=gradient;
+    ctx.lineWidth=layer.width;
+    ctx.globalAlpha=layer.opacity;
+    ctx.filter=layer.blur?"blur("+layer.blur+"px)":"none";
+    ctx.stroke();
+  }
+  ctx.filter="none";
+  const glow=ctx.createRadialGradient(ball.x,ball.y,1,ball.x,ball.y,charged?25:20);
+  glow.addColorStop(0,"rgba("+rgb+",.38)");
+  glow.addColorStop(1,"rgba("+rgb+",0)");
+  ctx.globalAlpha=1;
+  ctx.fillStyle=glow;
+  ctx.beginPath();
+  ctx.arc(ball.x,ball.y,charged?25:20,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
 function draw() {
   ctx.setTransform(field.width/W,0,0,field.height/H,0,0);
   background();
@@ -606,21 +654,7 @@ function draw() {
   }
   drawDJ();
   for(const ball of balls) {
-    if(!motion && !ball.attached && ball.trail.length) {
-      const tone=ball.pierce?LIME:"#f4e9cf";
-      ctx.save();
-      for(let i=0;i<ball.trail.length;i++) {
-        const p=ball.trail[i];
-        const fade=p.life/.15;
-        ctx.globalAlpha=fade*.26;
-        ctx.fillStyle=tone;
-        ctx.beginPath();
-        ctx.ellipse(p.x,p.y,Math.max(1,R*(.24+.5*fade)),Math.max(1,R*spriteAspect*(.24+.5*fade)),0,0,Math.PI*2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
+    drawBallTrail(ball);
     if(ball.attached && throwElapsed >= 0) continue;
     const size = R*2+4, height = size*spriteAspect;
     const name = ball.pierce ? "vinyl-charged" : "vinyl";
